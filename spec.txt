@@ -1,0 +1,545 @@
+# tpt-voice
+
+**A pure-Rust, memory-safe speech processing engine. Transcription, voice isolation, diarization, and text-based editing. The intelligence layer of the TPT AV stack.**
+
+**License:** MIT  
+**Status:** Early-stage / Pre-1.0  
+**Ecosystem:** [TPT Solutions Open Source](https://opensource.tptsolutions.co.nz/)
+
+---
+
+## 1. Vision & Philosophy
+
+`tpt-voice` is the **speech and AI layer** of the TPT AV Stack. It provides pure-Rust implementations of speech recognition, voice separation, speaker identification, and text-based editing workflows.
+
+The current Rust ecosystem has **zero pure-Rust speech processing libraries**. Every existing solution (`whisper-rs`, `vosk`, `deepspeech`) is a binding to C/C++ code, which means:
+- GPL/LGPL licensing contamination
+- Complex build systems and cross-compilation nightmares
+- No real-time safety guarantees
+- No integration with Rust's type system and memory safety
+
+`tpt-voice` fills this gap by providing:
+1. **Pure Rust ASR** (Automatic Speech Recognition) — no C/C++ dependencies
+2. **Real-time voice isolation** — AI-driven noise reduction tuned for human speech
+3. **Speaker diarization** — identifying "Speaker A" vs "Speaker B" in multi-person recordings
+4. **Text-based editing** — the ability to edit audio/video by editing a transcript
+5. **Strict MIT licensing** — zero copyleft contamination
+
+### Core Tenets
+
+1. **Pure Rust, Zero External AI Dependencies:** No PyTorch, no TensorFlow, no C/C++ bindings. All models are implemented in pure Rust or use permissively licensed Rust ML crates.
+2. **Real-Time Capable:** Voice isolation and transcription can run in real-time or faster-than-real-time on modern hardware.
+3. **Streaming-First Architecture:** All processing supports streaming input (audio chunks) rather than requiring the entire file upfront.
+4. **Text-Based Editing Native:** The engine is designed from the ground up to support editing audio/video by manipulating text transcripts.
+5. **Pure MIT Licensing:** No GPL/LGPL/MPL dependencies. Enforced via `cargo-deny` in CI.
+6. **Composable Architecture:** Each sub-crate is independently useful. A developer can use just the transcriber, just the voice isolator, or just the diarizer.
+
+---
+
+## 2. Ecosystem Integration
+
+`tpt-voice` sits in the **Intelligence Layer** of the TPT AV Stack, consuming decoded audio from `tpt-audio` and providing semantic understanding (text, speaker labels, isolated voices).
+
+| Crate | Role | Relationship to `tpt-voice` |
+| :--- | :--- | :--- |
+| **`tpt-cadence`** | Audio codecs | Decodes audio files into raw PCM `f32` samples. `tpt-voice` consumes this PCM. |
+| **`tpt-audio`** | Audio processing, timeline | Manages the audio timeline. `tpt-voice` provides transcript data that can be linked to timeline clips. |
+| **`tpt-voice`** | **Speech & AI (this repo)** | Transcribes audio, isolates voices, identifies speakers, and enables text-based editing. |
+| **`tpt-visual`** | Video processing | Can consume transcript data for auto-captioning and subtitle generation. |
+
+### Data Flow
+tpt-cadence (decodes audio files → raw PCM f32)
+↓
+tpt-audio (manages timeline, plays audio)
+↓
+tpt-voice (processes PCM → transcript, speaker labels, isolated voices)
+↓
+Application (displays transcript, enables text-based editing, generates captions)
+
+
+---
+
+## 3. Repository Architecture (Cargo Workspace)
+
+All sub-crates share the `tpt-av-voice-` prefix for ecosystem coherence and clean namespace resolution on crates.io.
+
+```text
+tpt-voice/                        # GitHub Repository / Workspace Root
+├── Cargo.toml                    # Workspace manifest
+├── deny.toml                     # cargo-deny license audit config
+├── LICENSE-MIT
+├── README.md
+├── DESIGN.md                     # This file
+│
+├── tpt-av-voice-utils/           # Shared types, math helpers, error handling
+│   ├── src/
+│   │   ├── lib.rs
+│   │   ├── audio_chunk.rs        # Streaming audio chunk types
+│   │   ├── transcript.rs         # Transcript data structures
+│   │   ├── speaker.rs            # Speaker identification types
+│   │   ├── time.rs               # Time alignment types
+│   │   └── error.rs              # `VoiceError` enum
+│   └── Cargo.toml
+│
+├── tpt-av-voice-transcribe/      # Speech-to-text engine
+│   ├── src/
+│   │   ├── lib.rs
+│   │   ├── model.rs              # ASR model architecture (transformer-based)
+│   │   ├── encoder.rs            # Audio feature extraction (mel spectrogram)
+│   │   ├── decoder.rs            # Text decoding (beam search, CTC)
+│   │   ├── tokenizer.rs          # Text tokenization (BPE, WordPiece)
+│   │   ├── weights.rs            # Model weight loading and management
+│   │   ├── transcriber.rs        # High-level transcription API
+│   │   └── streaming.rs          # Streaming transcription support
+│   ├── Cargo.toml
+│   └── tests/
+│
+├── tpt-av-voice-isolate/         # Voice isolation and noise reduction
+│   ├── src/
+│   │   ├── lib.rs
+│   │   ├── model.rs              # Voice separation model (U-Net, transformer)
+│   │   ├── stft.rs               # Short-Time Fourier Transform
+│   │   ├── istft.rs              # Inverse STFT
+│   │   ├── mask.rs               # Time-frequency masking
+│   │   ├── isolator.rs           # High-level voice isolation API
+│   │   └── streaming.rs          # Streaming isolation support
+│   ├── Cargo.toml
+│   └── tests/
+│
+├── tpt-av-voice-diarize/         # Speaker diarization
+│   ├── src/
+│   │   ├── lib.rs
+│   │   ├── embedding.rs          # Speaker embedding extraction (d-vectors, x-vectors)
+│   │   ├── clustering.rs         # Speaker clustering (spectral clustering, AHC)
+│   │   ├── segmentation.rs       # Voice activity detection and segmentation
+│   │   ├── diarizer.rs           # High-level diarization API
+│   │   └── streaming.rs          # Streaming diarization support
+│   ├── Cargo.toml
+│   └── tests/
+│
+├── tpt-av-voice-align/           # Text-audio alignment
+│   ├── src/
+│   │   ├── lib.rs
+│   │   ├── forced_align.rs       # Forced alignment (CTC-based)
+│   │   ├── phoneme.rs            # Phoneme-level alignment
+│   │   ├── word_align.rs         # Word-level alignment
+│   │   └── aligner.rs            # High-level alignment API
+│   ├── Cargo.toml
+│   └── tests/
+│
+├── tpt-av-voice-tts/             # Text-to-speech (future)
+│   ├── src/
+│   ├── Cargo.toml
+│   └── tests/
+│
+└── examples/                     # Demos and integration tests
+    ├── transcribe_audio.rs       # Transcribe an audio file
+    ├── isolate_voice.rs          # Isolate voice from background noise
+    ├── diarize_meeting.rs        # Identify speakers in a meeting recording
+    └── text_based_edit.rs        # Edit audio by editing transcript
+
+4. Core API Design
+4.1. Transcript Data Structures (tpt-av-voice-utils)
+
+/// A complete transcript of an audio file.
+pub struct Transcript {
+    /// All segments in the transcript.
+    pub segments: Vec<TranscriptSegment>,
+    /// Full text (concatenation of all segments).
+    pub full_text: String,
+    /// Language code (e.g., "en", "es", "fr").
+    pub language: String,
+    /// Confidence score (0.0 to 1.0).
+    pub confidence: f32,
+}
+
+/// A single segment of the transcript (sentence or phrase).
+pub struct TranscriptSegment {
+    /// Unique segment identifier.
+    pub id: SegmentId,
+    /// Start time (in seconds).
+    pub start_time: f64,
+    /// End time (in seconds).
+    pub end_time: f64,
+    /// Text content of the segment.
+    pub text: String,
+    /// Speaker label (if diarization was performed).
+    pub speaker: Option<SpeakerLabel>,
+    /// Confidence score for this segment.
+    pub confidence: f32,
+    /// Word-level timestamps (optional).
+    pub words: Option<Vec<WordTimestamp>>,
+}
+
+/// Word-level timestamp.
+pub struct WordTimestamp {
+    /// The word.
+    pub word: String,
+    /// Start time (in seconds).
+    pub start_time: f64,
+    /// End time (in seconds).
+    pub end_time: f64,
+    /// Confidence score.
+    pub confidence: f32,
+}
+
+/// Speaker label.
+pub struct SpeakerLabel {
+    /// Speaker identifier (e.g., "SPEAKER_00", "SPEAKER_01").
+    pub id: String,
+    /// Display name (if known).
+    pub name: Option<String>,
+}
+
+4.3. Voice Isolation API (tpt-av-voice-isolate)
+
+/// Voice isolation engine.
+pub struct VoiceIsolator {
+    /// The separation model.
+    model: SeparationModel,
+    /// Configuration.
+    config: IsolatorConfig,
+}
+
+/// Configuration for the isolator.
+pub struct IsolatorConfig {
+    /// Target source type (voice, noise, music, other).
+    pub target: SourceType,
+    /// Window size for STFT (in samples).
+    pub window_size: usize,
+    /// Hop size for STFT (in samples).
+    pub hop_size: usize,
+}
+
+impl VoiceIsolator {
+    /// Creates a new voice isolator.
+    pub fn new(model_path: &Path, config: IsolatorConfig) -> Result<Self, VoiceError>;
+
+    /// Isolates voice from an audio file.
+    pub fn isolate_file(
+        &mut self,
+        audio_path: &Path,
+    ) -> Result<IsolatedAudio, VoiceError> {
+        // 1. Load audio file
+        // 2. Compute STFT
+        // 3. Run separation model (predict masks)
+        // 4. Apply masks to STFT
+        // 5. Compute inverse STFT
+        // 6. Return isolated audio
+        todo!()
+    }
+
+    /// Isolates voice from a stream of audio chunks (real-time).
+    pub fn isolate_stream(
+        &mut self,
+        chunks: impl Iterator<Item = AudioChunk>,
+    ) -> impl Iterator<Item = AudioChunk> {
+        // Streaming isolation with overlap-add
+        todo!()
+    }
+}
+
+/// Isolated audio sources.
+pub struct IsolatedAudio {
+    /// Isolated voice.
+    pub voice: Vec<f32>,
+    /// Isolated background noise.
+    pub noise: Vec<f32>,
+    /// Sample rate.
+    pub sample_rate: u32,
+}
+
+4.4. Diarization API (tpt-av-voice-diarize)
+
+/// Speaker diarization engine.
+pub struct Diarizer {
+    /// Embedding extraction model.
+    embedding_model: EmbeddingModel,
+    /// Clustering algorithm.
+    clustering: ClusteringAlgorithm,
+    /// Configuration.
+    config: DiarizerConfig,
+}
+
+/// Configuration for the diarizer.
+pub struct DiarizerConfig {
+    /// Minimum number of speakers (optional).
+    pub min_speakers: Option<usize>,
+    /// Maximum number of speakers (optional).
+    pub max_speakers: Option<usize>,
+    /// Expected number of speakers (optional).
+    pub num_speakers: Option<usize>,
+    /// Threshold for speaker change detection.
+    pub threshold: f32,
+}
+
+impl Diarizer {
+    /// Creates a new diarizer.
+    pub fn new(
+        embedding_model_path: &Path,
+        config: DiarizerConfig,
+    ) -> Result<Self, VoiceError>;
+
+    /// Diarizes an audio file (identifies speakers).
+    pub fn diarize_file(
+        &mut self,
+        audio_path: &Path,
+    ) -> Result<DiarizationResult, VoiceError> {
+        // 1. Load audio file
+        // 2. Voice activity detection (segment speech vs silence)
+        // 3. Extract speaker embeddings for each segment
+        // 4. Cluster embeddings (group by speaker)
+        // 5. Assign speaker labels to segments
+        todo!()
+    }
+}
+
+/// Diarization result.
+pub struct DiarizationResult {
+    /// Speaker segments (who spoke when).
+    pub segments: Vec<SpeakerSegment>,
+    /// Number of unique speakers detected.
+    pub num_speakers: usize,
+}
+
+/// A segment of speech by a specific speaker.
+pub struct SpeakerSegment {
+    /// Speaker label.
+    pub speaker: SpeakerLabel,
+    /// Start time (in seconds).
+    pub start_time: f64,
+    /// End time (in seconds).
+    pub end_time: f64,
+    /// Confidence score.
+    pub confidence: f32,
+}
+
+4.5. Text-Based Editing (tpt-av-voice-align)
+
+/// Text-audio alignment engine.
+pub struct Aligner {
+    /// Forced alignment model.
+    model: AlignmentModel,
+    /// Configuration.
+    config: AlignerConfig,
+}
+
+impl Aligner {
+    /// Creates a new aligner.
+    pub fn new(model_path: &Path, config: AlignerConfig) -> Result<Self, VoiceError>;
+
+    /// Aligns a transcript to audio (word-level timestamps).
+    pub fn align(
+        &mut self,
+        audio_path: &Path,
+        transcript: &str,
+    ) -> Result<AlignedTranscript, VoiceError> {
+        // 1. Load audio file
+        // 2. Extract audio features
+        // 3. Run forced alignment (CTC-based)
+        // 4. Return word-level timestamps
+        todo!()
+    }
+}
+
+/// Aligned transcript with word-level timestamps.
+pub struct AlignedTranscript {
+    /// Words with timestamps.
+    pub words: Vec<WordTimestamp>,
+    /// Full text.
+    pub text: String,
+}
+
+/// Text-based editing operations.
+pub struct TextBasedEditor {
+    /// Original transcript.
+    transcript: AlignedTranscript,
+    /// Edited transcript (user modifications).
+    edited_transcript: String,
+}
+
+impl TextBasedEditor {
+    /// Creates a new text-based editor.
+    pub fn new(transcript: AlignedTranscript) -> Self;
+
+    /// Applies text edits and returns the corresponding audio edit operations.
+    pub fn apply_edits(&mut self, edited_text: &str) -> Vec<AudioEdit> {
+        // 1. Diff original vs edited transcript
+        // 2. Map text changes to audio time ranges
+        // 3. Return audio edit operations (delete, insert, etc.)
+        todo!()
+    }
+}
+
+/// An audio edit operation derived from text editing.
+pub struct AudioEdit {
+    /// Edit type (delete, insert, replace).
+    pub edit_type: EditType,
+    /// Start time (in seconds).
+    pub start_time: f64,
+    /// End time (in seconds).
+    pub end_time: f64,
+    /// New audio content (for insert/replace).
+    pub new_audio: Option<Vec<f32>>,
+}
+
+5. Model Architecture
+5.1. ASR Model (Transcription)
+tpt-voice implements a transformer-based encoder-decoder architecture similar to Whisper, but written entirely in pure Rust.
+Encoder:
+Input: Mel spectrogram (80 or 128 channels)
+Architecture: Transformer encoder (12-24 layers)
+Output: Audio embeddings
+Decoder:
+Input: Audio embeddings + text tokens (autoregressive)
+Architecture: Transformer decoder (12-24 layers)
+Output: Text token probabilities
+Training:
+Models are pre-trained on large datasets (LibriSpeech, Common Voice, etc.)
+Weights are stored in a custom binary format (or safetensors)
+No PyTorch/TensorFlow runtime required
+5.2. Voice Isolation Model
+Architecture: U-Net or transformer-based time-frequency masking
+Pipeline:
+Input audio → STFT (magnitude + phase)
+STFT → Separation model (predicts masks for voice/noise)
+Apply masks → Inverse STFT → Isolated audio
+5.3. Speaker Embedding Model
+Architecture: Time-delay neural network (TDNN) or ECAPA-TDNN
+Pipeline:
+Input audio → Feature extraction (MFCC or mel spectrogram)
+Features → Embedding model → Fixed-size speaker embedding (256 or 512 dimensions)
+Embeddings → Clustering (spectral clustering or agglomerative hierarchical clustering)
+6. Performance Considerations
+6.1. Real-Time Factor (RTF)
+Task
+Target RTF
+Hardware Requirement
+Transcription
+< 0.5x (2x faster than real-time)
+CPU (AVX2) or GPU
+Voice Isolation
+< 1.0x (real-time)
+CPU (AVX2) or GPU
+Diarization
+< 0.3x (3x faster than real-time)
+CPU
+6.2. SIMD Optimization
+All heavy numerical operations (matrix multiplication, FFT, convolution) use SIMD intrinsics:
+x86_64: AVX2, AVX-512 (via std::arch)
+ARM: NEON (via std::arch)
+Fallback: Pure Rust scalar code
+6.3. GPU Acceleration (Optional)
+For maximum performance, tpt-voice can optionally use wgpu for GPU-accelerated inference:
+Transformer attention: GPU matrix multiplication
+STFT/ISTFT: GPU FFT
+Convolution: GPU convolution
+7. Roadmap
+Phase 1: Foundation & Transcription (Current)
+tpt-av-voice-utils with shared types (Transcript, SpeakerLabel, AudioChunk)
+tpt-av-voice-transcribe with basic transformer encoder-decoder
+Mel spectrogram extraction
+Beam search decoding
+Pre-trained model weights (English only, small model)
+Conformance tests against LibriSpeech dataset
+Phase 2: Voice Isolation
+tpt-av-voice-isolate with U-Net separation model
+STFT/ISTFT implementation
+Time-frequency masking
+Pre-trained model weights
+Real-time streaming isolation
+Phase 3: Diarization
+tpt-av-voice-diarize with speaker embedding extraction
+Voice activity detection
+Speaker clustering (spectral clustering)
+Multi-speaker transcription integration
+Phase 4: Text-Based Editing
+tpt-av-voice-align with forced alignment
+Word-level timestamps
+Text-based editing API
+Integration with tpt-audio timeline
+Phase 5: Advanced Features
+Multi-language support (Spanish, French, German, etc.)
+Larger, more accurate models
+GPU-accelerated inference
+Text-to-speech (tpt-av-voice-tts)
+8. Dependency & Licensing Rules
+Allowed Dependencies (Permissive Only)
+tpt-av-voice-utils (internal)
+tpt-av-voice-transcribe (internal)
+tpt-av-voice-isolate (internal)
+tpt-av-voice-diarize (internal)
+tpt-av-voice-align (internal)
+tpt-cadence (MIT) — for loading audio files
+ndarray (MIT/Apache) — N-dimensional arrays for ML
+rustfft (MIT/Apache) — FFT implementation
+serde (MIT/Apache) — serialization for model weights
+log (MIT/Apache) — logging facade
+Banned Dependencies
+torch / tensorflow / pytorch (BSD, but heavy and C++-based)
+whisper-rs (bindings to C++ Whisper)
+vosk (bindings to C++ Vosk)
+Any crate with GPL, LGPL, AGPL, or MPL in its dependency tree
+Enforcement
+The deny.toml file enforces this automatically:
+
+[licenses]
+unlicensed = "deny"
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+]
+deny = [
+    "GPL-2.0",
+    "GPL-3.0",
+    "LGPL-2.1",
+    "LGPL-3.0",
+    "AGPL-3.0",
+    "MPL-2.0",
+]
+
+9. Workspace Cargo.toml
+
+[workspace]
+resolver = "2"
+members = [
+    "tpt-av-voice-utils",
+    "tpt-av-voice-transcribe",
+    "tpt-av-voice-isolate",
+    "tpt-av-voice-diarize",
+    "tpt-av-voice-align",
+    "tpt-av-voice-tts",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/tpt-solutions/tpt-voice"
+rust-version = "1.75"
+
+[workspace.dependencies]
+tpt-av-voice-utils = { path = "tpt-av-voice-utils", version = "0.1.0" }
+tpt-av-voice-transcribe = { path = "tpt-av-voice-transcribe", version = "0.1.0" }
+tpt-av-voice-isolate = { path = "tpt-av-voice-isolate", version = "0.1.0" }
+tpt-av-voice-diarize = { path = "tpt-av-voice-diarize", version = "0.1.0" }
+tpt-av-voice-align = { path = "tpt-av-voice-align", version = "0.1.0" }
+tpt-cadence = { git = "https://github.com/tpt-solutions/tpt-cadence", version = "0.1.0" }
+ndarray = "0.15"
+rustfft = "6.2"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+
+10. Contributing & License
+This project is released under the MIT License.
+By contributing to tpt-voice, you agree that:
+Your code will be licensed under the same pure MIT terms.
+You will not introduce any dependency that is GPL, LGPL, AGPL, or MPL licensed.
+All ML models must be implemented in pure Rust (no C/C++ bindings).
+All models must include conformance tests against standard datasets (LibriSpeech, VoxCeleb, etc.).
+This ensures tpt-voice remains free, open, and unencumbered by copyleft restrictions for all future speech processing software development.
+
