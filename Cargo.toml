@@ -1,0 +1,44 @@
+[workspace]
+resolver = "2"
+members = [
+    "tpt-av-voice-utils",
+    "tpt-av-voice-transcribe",
+    "tpt-av-voice-isolate",
+    "tpt-av-voice-diarize",
+    "tpt-av-voice-align",
+    "tpt-av-voice-tts",
+    "examples",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/tpt-solutions/tpt-voice"
+rust-version = "1.75"
+authors = ["TPT Solutions <opensource@tptsolutions.co.nz>"]
+
+[workspace.dependencies]
+tpt-av-voice-utils = { path = "tpt-av-voice-utils", version = "0.1.0" }
+tpt-av-voice-transcribe = { path = "tpt-av-voice-transcribe", version = "0.1.0" }
+tpt-av-voice-isolate = { path = "tpt-av-voice-isolate", version = "0.1.0" }
+tpt-av-voice-diarize = { path = "tpt-av-voice-diarize", version = "0.1.0" }
+tpt-av-voice-align = { path = "tpt-av-voice-align", version = "0.1.0" }
+tpt-av-voice-tts = { path = "tpt-av-voice-tts", version = "0.1.0" }
+ndarray = "0.15"
+rustfft = "6.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+# The NN hot paths (attention, matmul) are unusably slow unoptimized;
+# dev/test builds get light optimization.
+[profile.dev]
+opt-level = 1
+
+[profile.test]
+opt-level = 1

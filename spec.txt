@@ -2,7 +2,7 @@
 
 **A pure-Rust, memory-safe speech processing engine. Transcription, voice isolation, diarization, and text-based editing. The intelligence layer of the TPT AV stack.**
 
-**License:** MIT  
+**License:** MIT OR Apache-2.0  
 **Status:** Early-stage / Pre-1.0  
 **Ecosystem:** [TPT Solutions Open Source](https://opensource.tptsolutions.co.nz/)
 
@@ -23,7 +23,7 @@ The current Rust ecosystem has **zero pure-Rust speech processing libraries**. E
 2. **Real-time voice isolation** — AI-driven noise reduction tuned for human speech
 3. **Speaker diarization** — identifying "Speaker A" vs "Speaker B" in multi-person recordings
 4. **Text-based editing** — the ability to edit audio/video by editing a transcript
-5. **Strict MIT licensing** — zero copyleft contamination
+5. **Permissive licensing only** — dual MIT OR Apache-2.0; zero copyleft contamination
 
 ### Core Tenets
 
@@ -31,7 +31,7 @@ The current Rust ecosystem has **zero pure-Rust speech processing libraries**. E
 2. **Real-Time Capable:** Voice isolation and transcription can run in real-time or faster-than-real-time on modern hardware.
 3. **Streaming-First Architecture:** All processing supports streaming input (audio chunks) rather than requiring the entire file upfront.
 4. **Text-Based Editing Native:** The engine is designed from the ground up to support editing audio/video by manipulating text transcripts.
-5. **Pure MIT Licensing:** No GPL/LGPL/MPL dependencies. Enforced via `cargo-deny` in CI.
+5. **Pure Permissive Licensing:** MIT OR Apache-2.0 only. No GPL/LGPL/MPL dependencies. Enforced via `cargo-deny` in CI.
 6. **Composable Architecture:** Each sub-crate is independently useful. A developer can use just the transcriber, just the voice isolator, or just the diarizer.
 
 ---
@@ -518,7 +518,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/tpt-solutions/tpt-voice"
 rust-version = "1.75"
 
@@ -535,9 +535,9 @@ serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 
 10. Contributing & License
-This project is released under the MIT License.
+This project is dual-licensed under the MIT License or the Apache License 2.0, at the contributor's or user's option.
 By contributing to tpt-voice, you agree that:
-Your code will be licensed under the same pure MIT terms.
+Your code will be dual-licensed under the same MIT OR Apache-2.0 terms.
 You will not introduce any dependency that is GPL, LGPL, AGPL, or MPL licensed.
 All ML models must be implemented in pure Rust (no C/C++ bindings).
 All models must include conformance tests against standard datasets (LibriSpeech, VoxCeleb, etc.).

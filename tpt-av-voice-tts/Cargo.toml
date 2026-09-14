@@ -1,0 +1,16 @@
+[package]
+name = "tpt-av-voice-tts"
+description = "Pure-Rust text-to-speech (early stage): rule-based grapheme-to-speech with a formant synthesizer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+keywords = ["audio", "speech-synthesis", "tts"]
+categories = ["multimedia::audio"]
+
+[dependencies]
+tpt-av-voice-utils = { workspace = true }
+serde = { workspace = true }
+log = { workspace = true }

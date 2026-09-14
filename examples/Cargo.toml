@@ -1,0 +1,34 @@
+[package]
+name = "tpt-voice-examples"
+description = "End-to-end examples for the tpt-voice speech processing engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+tpt-av-voice-utils = { workspace = true }
+tpt-av-voice-transcribe = { workspace = true }
+tpt-av-voice-isolate = { workspace = true }
+tpt-av-voice-diarize = { workspace = true }
+tpt-av-voice-align = { workspace = true }
+tpt-av-voice-tts = { workspace = true }
+
+[[example]]
+name = "transcribe_audio"
+path = "transcribe_audio.rs"
+
+[[example]]
+name = "isolate_voice"
+path = "isolate_voice.rs"
+
+[[example]]
+name = "diarize_meeting"
+path = "diarize_meeting.rs"
+
+[[example]]
+name = "text_based_edit"
+path = "text_based_edit.rs"

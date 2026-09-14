@@ -1,0 +1,18 @@
+[package]
+name = "tpt-av-voice-align"
+description = "Pure-Rust text-audio alignment and text-based editing: forced alignment, word timestamps, AudioEdit operations"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+keywords = ["audio", "alignment", "editing", "speech"]
+categories = ["multimedia::audio"]
+
+[dependencies]
+tpt-av-voice-utils = { workspace = true }
+ndarray = { workspace = true }
+rustfft = { workspace = true }
+serde = { workspace = true }
+log = { workspace = true }

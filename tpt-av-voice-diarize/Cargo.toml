@@ -1,0 +1,18 @@
+[package]
+name = "tpt-av-voice-diarize"
+description = "Pure-Rust speaker diarization: voice activity detection, speaker embeddings, and clustering"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+keywords = ["audio", "diarization", "speech", "speaker"]
+categories = ["multimedia::audio"]
+
+[dependencies]
+tpt-av-voice-utils = { workspace = true }
+ndarray = { workspace = true }
+rustfft = { workspace = true }
+serde = { workspace = true }
+log = { workspace = true }

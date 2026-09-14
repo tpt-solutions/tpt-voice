@@ -1,0 +1,19 @@
+[package]
+name = "tpt-av-voice-isolate"
+description = "Pure-Rust real-time voice isolation: STFT masking with neural or classical spectral subtraction"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+keywords = ["audio", "noise-reduction", "speech", "dsp"]
+categories = ["multimedia::audio"]
+
+[dependencies]
+tpt-av-voice-utils = { workspace = true }
+ndarray = { workspace = true }
+rustfft = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }

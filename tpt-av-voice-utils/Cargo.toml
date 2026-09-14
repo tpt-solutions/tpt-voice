@@ -1,0 +1,22 @@
+[package]
+name = "tpt-av-voice-utils"
+description = "Shared types, DSP/NN kernels, WAV I/O and error handling for the tpt-voice speech processing engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+keywords = ["audio", "speech", "dsp"]
+categories = ["multimedia::audio"]
+
+[dependencies]
+ndarray = { workspace = true }
+rustfft = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+
+[features]
+default = []
+avx512 = []
