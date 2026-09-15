@@ -45,10 +45,32 @@ jobs:
       - run: cargo test --workspace
 
   deny:
-    name: cargo-deny (license audit)
+    name: cargo-deny (license + advisory audit)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
-          command: check licenses bans
+          command: check licenses bans advisories
+
+  wasm:
+    name: WASM build (wasm32-unknown-unknown)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace --target wasm32-unknown-unknown --exclude tpt-voice-examples
+
+  msrv:
+    name: MSRV (1.75)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.75
+      - uses: Swatinem/rust-cache@v2
+      # The avx512 feature requires newer intrinsics; it is not part of
+      # the MSRV surface.
+      - run: cargo check --workspace --lib --examples

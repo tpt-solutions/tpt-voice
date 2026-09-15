@@ -51,7 +51,10 @@ impl Default for IsolatorConfig {
 
 impl IsolatorConfig {
     fn stft_config(&self) -> StftConfig {
-        StftConfig { n_fft: self.window_size, hop_size: self.hop_size }
+        StftConfig {
+            n_fft: self.window_size,
+            hop_size: self.hop_size,
+        }
     }
 
     fn validate(&self) -> Result<(), VoiceError> {
@@ -93,13 +96,19 @@ pub struct VoiceIsolator {
 impl VoiceIsolator {
     /// Loads a trained separation model from a directory containing
     /// `model.safetensors` and `config.json`.
-    pub fn from_model_dir(config: IsolatorConfig, dir: impl AsRef<Path>) -> Result<Self, VoiceError> {
+    pub fn from_model_dir(
+        config: IsolatorConfig,
+        dir: impl AsRef<Path>,
+    ) -> Result<Self, VoiceError> {
         let dir = dir.as_ref();
         let tensors = safetensors::load_from_path(dir.join("model.safetensors"))?;
         let model_config_json = std::fs::read_to_string(dir.join("config.json"))?;
         let model_config: SeparationModelConfig = serde_json::from_str(&model_config_json)
             .map_err(|e| VoiceError::model(format!("bad model config: {e}")))?;
-        Self::from_model(SeparationModel::from_tensors(&tensors, model_config)?, config)
+        Self::from_model(
+            SeparationModel::from_tensors(&tensors, model_config)?,
+            config,
+        )
     }
 
     /// Uses an already-loaded separation model.
@@ -126,7 +135,11 @@ impl VoiceIsolator {
         config.validate()?;
         let n_bins = config.stft_config().n_bins();
         Ok(VoiceIsolator {
-            subtractor: Some(SpectralSubtractor::new(n_bins, config.alpha, config.gain_floor)),
+            subtractor: Some(SpectralSubtractor::new(
+                n_bins,
+                config.alpha,
+                config.gain_floor,
+            )),
             model: None,
             config,
             stft: Stft::new(config.stft_config())?,
@@ -140,12 +153,18 @@ impl VoiceIsolator {
     }
 
     /// Isolates mono PCM samples; returns voice and residual noise.
-    pub fn isolate_samples(&mut self, samples: &[f32], sample_rate: u32) -> Result<IsolatedAudio, VoiceError> {
+    pub fn isolate_samples(
+        &mut self,
+        samples: &[f32],
+        sample_rate: u32,
+    ) -> Result<IsolatedAudio, VoiceError> {
         if samples.is_empty() {
             return Err(VoiceError::from(tpt_av_voice_utils::AudioError::Empty));
         }
         if sample_rate != 16_000 {
-            return Err(VoiceError::config("the isolator processes 16 kHz audio; resample first"));
+            return Err(VoiceError::config(
+                "the isolator processes 16 kHz audio; resample first",
+            ));
         }
         let _ = &self.config.target; // documented knob; voice is the primary target
 
@@ -165,12 +184,12 @@ impl VoiceIsolator {
         let masked = mask_spectrum(&spec, &mask);
         let mut voice = self.istft.reconstruct(&masked, padded.len());
         voice.truncate(samples.len());
-        let noise: Vec<f32> = samples
-            .iter()
-            .zip(&voice)
-            .map(|(s, v)| s - v)
-            .collect();
-        Ok(IsolatedAudio { voice, noise, sample_rate })
+        let noise: Vec<f32> = samples.iter().zip(&voice).map(|(s, v)| s - v).collect();
+        Ok(IsolatedAudio {
+            voice,
+            noise,
+            sample_rate,
+        })
     }
 
     /// Isolates voice from a WAV file.
@@ -209,7 +228,9 @@ impl VoiceIsolator {
         } else if let Some(sub) = &mut self.subtractor {
             Ok(sub.frame_mask(magnitude))
         } else {
-            Err(VoiceError::model("isolator has neither model nor classical subtractor"))
+            Err(VoiceError::model(
+                "isolator has neither model nor classical subtractor",
+            ))
         }
     }
 
@@ -234,7 +255,9 @@ impl VoiceIsolator {
             }
             Ok(mask)
         } else {
-            Err(VoiceError::model("isolator has neither model nor classical subtractor"))
+            Err(VoiceError::model(
+                "isolator has neither model nor classical subtractor",
+            ))
         }
     }
 }
@@ -246,8 +269,14 @@ pub fn write_demo_model(dir: impl AsRef<Path>, seed: u64) -> Result<(), VoiceErr
     std::fs::create_dir_all(dir)?;
     let config = SeparationModelConfig::default();
     let model = SeparationModel::random_init(config.clone(), seed);
-    tpt_av_voice_utils::safetensors::save_to_path(dir.join("model.safetensors"), &model.to_tensors())?;
-    std::fs::write(dir.join("config.json"), serde_json::to_string_pretty(&config).unwrap())?;
+    tpt_av_voice_utils::safetensors::save_to_path(
+        dir.join("model.safetensors"),
+        &model.to_tensors(),
+    )?;
+    std::fs::write(
+        dir.join("config.json"),
+        serde_json::to_string_pretty(&config).unwrap(),
+    )?;
     Ok(())
 }
 
@@ -273,7 +302,11 @@ mod tests {
 
     #[test]
     fn classical_rejects_bad_config_and_empty() {
-        assert!(VoiceIsolator::classical(IsolatorConfig { window_size: 500, ..config() }).is_err());
+        assert!(VoiceIsolator::classical(IsolatorConfig {
+            window_size: 500,
+            ..config()
+        })
+        .is_err());
         let mut iso = VoiceIsolator::classical(config()).unwrap();
         assert!(matches!(
             iso.isolate_samples(&[], 16_000),
@@ -308,7 +341,10 @@ mod tests {
         let out = iso.isolate_samples(&input, 16_000).unwrap();
         let in_rms = tpt_av_voice_utils::dsp::rms(&input);
         let out_rms = tpt_av_voice_utils::dsp::rms(&out.voice);
-        assert!(out_rms <= in_rms * 1.05, "isolation must not amplify: {out_rms} vs {in_rms}");
+        assert!(
+            out_rms <= in_rms * 1.05,
+            "isolation must not amplify: {out_rms} vs {in_rms}"
+        );
     }
 
     #[test]
@@ -324,7 +360,10 @@ mod tests {
         // amplify, and voice+noise must reconstruct the input.
         let in_rms = tpt_av_voice_utils::dsp::rms(&input);
         let ratio = tpt_av_voice_utils::dsp::rms(&out.voice) / in_rms.max(1e-9);
-        assert!((0.0..=1.02).contains(&ratio), "unexpected untrained ratio {ratio}");
+        assert!(
+            (0.0..=1.02).contains(&ratio),
+            "unexpected untrained ratio {ratio}"
+        );
         for i in (0..input.len()).step_by(97) {
             assert!((input[i] - out.voice[i] - out.noise[i]).abs() < 1e-4);
         }
@@ -333,9 +372,14 @@ mod tests {
 
     #[test]
     fn mismatched_bins_rejected() {
-        let dir = std::env::temp_dir().join(format!("tpt-voice-isolate-bad-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("tpt-voice-isolate-bad-{}", std::process::id()));
         write_demo_model(&dir, 3).unwrap();
-        let bad = IsolatorConfig { window_size: 1024, hop_size: 512, ..config() };
+        let bad = IsolatorConfig {
+            window_size: 1024,
+            hop_size: 512,
+            ..config()
+        };
         assert!(VoiceIsolator::from_model_dir(bad, &dir).is_err());
         let _ = std::fs::remove_dir_all(&dir);
     }

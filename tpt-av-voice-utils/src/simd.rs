@@ -13,6 +13,7 @@ use std::arch::x86_64::{
 };
 
 /// `a · b`.
+#[allow(unreachable_code)] // scalar tail is dead on aarch64
 pub fn dot(a: &[f32], b: &[f32]) -> f32 {
     #[cfg(target_arch = "x86_64")]
     {
@@ -35,6 +36,7 @@ pub fn dot(a: &[f32], b: &[f32]) -> f32 {
 }
 
 /// `y += alpha * x`.
+#[allow(unreachable_code)] // scalar tail is dead on aarch64
 pub fn axpy(x: &[f32], alpha: f32, y: &mut [f32]) {
     debug_assert_eq!(x.len(), y.len());
     #[cfg(target_arch = "x86_64")]
@@ -58,6 +60,7 @@ pub fn axpy(x: &[f32], alpha: f32, y: &mut [f32]) {
 }
 
 /// `Σ x[i]²`.
+#[allow(unreachable_code)] // scalar tail is dead on aarch64
 pub fn sum_squares(x: &[f32]) -> f32 {
     #[cfg(target_arch = "x86_64")]
     {
@@ -110,8 +113,11 @@ unsafe fn avx2_dot(a: &[f32], b: &[f32]) -> f32 {
     let mut lanes = [0f32; AVX_LANES];
     _mm256_storeu_ps(lanes.as_mut_ptr(), acc);
     let mut sum: f32 = lanes.iter().sum();
-    for i in chunks * AVX_LANES..n {
-        sum += a[i] * b[i];
+    for (&ai, &bi) in a[chunks * AVX_LANES..n]
+        .iter()
+        .zip(&b[chunks * AVX_LANES..n])
+    {
+        sum += ai * bi;
     }
     sum
 }
@@ -125,7 +131,10 @@ unsafe fn avx2_axpy(x: &[f32], alpha: f32, y: &mut [f32]) {
     for i in 0..chunks {
         let vx = _mm256_loadu_ps(x.as_ptr().add(i * AVX_LANES));
         let vy = _mm256_loadu_ps(y.as_ptr().add(i * AVX_LANES));
-        _mm256_storeu_ps(y.as_mut_ptr().add(i * AVX_LANES), _mm256_add_ps(vy, _mm256_mul_ps(va, vx)));
+        _mm256_storeu_ps(
+            y.as_mut_ptr().add(i * AVX_LANES),
+            _mm256_add_ps(vy, _mm256_mul_ps(va, vx)),
+        );
     }
     for i in chunks * AVX_LANES..n {
         y[i] += alpha * x[i];
@@ -145,8 +154,8 @@ unsafe fn avx2_sum_squares(x: &[f32]) -> f32 {
     let mut lanes = [0f32; AVX_LANES];
     _mm256_storeu_ps(lanes.as_mut_ptr(), acc);
     let mut sum: f32 = lanes.iter().sum();
-    for i in chunks * AVX_LANES..n {
-        sum += x[i] * x[i];
+    for &xi in x[chunks * AVX_LANES..n].iter() {
+        sum += xi * xi;
     }
     sum
 }
@@ -187,7 +196,10 @@ mod avx512 {
         for i in 0..chunks {
             let vx = _mm512_loadu_ps(x.as_ptr().add(i * LANES));
             let vy = _mm512_loadu_ps(y.as_ptr().add(i * LANES));
-            _mm512_storeu_ps(y.as_mut_ptr().add(i * LANES), _mm512_add_ps(vy, _mm512_mul_ps(va, vx)));
+            _mm512_storeu_ps(
+                y.as_mut_ptr().add(i * LANES),
+                _mm512_add_ps(vy, _mm512_mul_ps(va, vx)),
+            );
         }
         for i in chunks * LANES..n {
             y[i] += alpha * x[i];
@@ -217,7 +229,7 @@ unsafe fn avx512_axpy(x: &[f32], alpha: f32, y: &mut [f32]) {
 
 #[cfg(target_arch = "aarch64")]
 use std::arch::aarch64::{
-    vaddvq_f32, vfmaq_f32, vld1q_f32, vmulq_n_f32, vaddq_f32, vst1q_f32, vdupq_n_f32,
+    vaddq_f32, vaddvq_f32, vdupq_n_f32, vfmaq_f32, vld1q_f32, vmulq_n_f32, vst1q_f32,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -247,7 +259,10 @@ unsafe fn neon_axpy(x: &[f32], alpha: f32, y: &mut [f32]) {
     for i in 0..chunks {
         let vx = vld1q_f32(x.as_ptr().add(i * NEON_LANES));
         let vy = vld1q_f32(y.as_ptr().add(i * NEON_LANES));
-        vst1q_f32(y.as_mut_ptr().add(i * NEON_LANES), vaddq_f32(vy, vmulq_n_f32(vx, alpha)));
+        vst1q_f32(
+            y.as_mut_ptr().add(i * NEON_LANES),
+            vaddq_f32(vy, vmulq_n_f32(vx, alpha)),
+        );
     }
     for i in chunks * NEON_LANES..n {
         y[i] += alpha * x[i];
@@ -315,7 +330,10 @@ mod tests {
             let (x, _) = test_data(n);
             let fast = sum_squares(&x);
             let slow = scalar_sum_squares(&x);
-            assert!((fast - slow).abs() < slow.max(1.0) * 1e-4, "n={n}: {fast} vs {slow}");
+            assert!(
+                (fast - slow).abs() < slow.max(1.0) * 1e-4,
+                "n={n}: {fast} vs {slow}"
+            );
         }
     }
 }

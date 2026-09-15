@@ -15,9 +15,46 @@ use std::fmt;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Phoneme {
     // Monophthongs
-    AA, AE, AH, AO, AW, AY, EH, ER, EY, IH, IY, OW, OY, UH, UW,
+    AA,
+    AE,
+    AH,
+    AO,
+    AW,
+    AY,
+    EH,
+    ER,
+    EY,
+    IH,
+    IY,
+    OW,
+    OY,
+    UH,
+    UW,
     // Consonants
-    B, CH, D, DH, F, G, HH, JH, K, L, M, N, NG, P, R, S, SH, T, TH, V, W, Y, Z, ZH,
+    B,
+    CH,
+    D,
+    DH,
+    F,
+    G,
+    HH,
+    JH,
+    K,
+    L,
+    M,
+    N,
+    NG,
+    P,
+    R,
+    S,
+    SH,
+    T,
+    TH,
+    V,
+    W,
+    Y,
+    Z,
+    ZH,
     // Special
     SIL,
 }
@@ -26,19 +63,45 @@ impl Phoneme {
     /// ARPAbet spelling.
     pub fn as_str(&self) -> &'static str {
         match self {
-            Phoneme::AA => "AA", Phoneme::AE => "AE", Phoneme::AH => "AH",
-            Phoneme::AO => "AO", Phoneme::AW => "AW", Phoneme::AY => "AY",
-            Phoneme::EH => "EH", Phoneme::ER => "ER", Phoneme::EY => "EY",
-            Phoneme::IH => "IH", Phoneme::IY => "IY", Phoneme::OW => "OW",
-            Phoneme::OY => "OY", Phoneme::UH => "UH", Phoneme::UW => "UW",
-            Phoneme::B => "B", Phoneme::CH => "CH", Phoneme::D => "D",
-            Phoneme::DH => "DH", Phoneme::F => "F", Phoneme::G => "G",
-            Phoneme::HH => "HH", Phoneme::JH => "JH", Phoneme::K => "K",
-            Phoneme::L => "L", Phoneme::M => "M", Phoneme::N => "N",
-            Phoneme::NG => "NG", Phoneme::P => "P", Phoneme::R => "R",
-            Phoneme::S => "S", Phoneme::SH => "SH", Phoneme::T => "T",
-            Phoneme::TH => "TH", Phoneme::V => "V", Phoneme::W => "W",
-            Phoneme::Y => "Y", Phoneme::Z => "Z", Phoneme::ZH => "ZH",
+            Phoneme::AA => "AA",
+            Phoneme::AE => "AE",
+            Phoneme::AH => "AH",
+            Phoneme::AO => "AO",
+            Phoneme::AW => "AW",
+            Phoneme::AY => "AY",
+            Phoneme::EH => "EH",
+            Phoneme::ER => "ER",
+            Phoneme::EY => "EY",
+            Phoneme::IH => "IH",
+            Phoneme::IY => "IY",
+            Phoneme::OW => "OW",
+            Phoneme::OY => "OY",
+            Phoneme::UH => "UH",
+            Phoneme::UW => "UW",
+            Phoneme::B => "B",
+            Phoneme::CH => "CH",
+            Phoneme::D => "D",
+            Phoneme::DH => "DH",
+            Phoneme::F => "F",
+            Phoneme::G => "G",
+            Phoneme::HH => "HH",
+            Phoneme::JH => "JH",
+            Phoneme::K => "K",
+            Phoneme::L => "L",
+            Phoneme::M => "M",
+            Phoneme::N => "N",
+            Phoneme::NG => "NG",
+            Phoneme::P => "P",
+            Phoneme::R => "R",
+            Phoneme::S => "S",
+            Phoneme::SH => "SH",
+            Phoneme::T => "T",
+            Phoneme::TH => "TH",
+            Phoneme::V => "V",
+            Phoneme::W => "W",
+            Phoneme::Y => "Y",
+            Phoneme::Z => "Z",
+            Phoneme::ZH => "ZH",
             Phoneme::SIL => "SIL",
         }
     }
@@ -47,17 +110,31 @@ impl Phoneme {
     pub fn is_vowel(self) -> bool {
         matches!(
             self,
-            Phoneme::AA | Phoneme::AE | Phoneme::AH | Phoneme::AO | Phoneme::AW
-                | Phoneme::AY | Phoneme::EH | Phoneme::ER | Phoneme::EY
-                | Phoneme::IH | Phoneme::IY | Phoneme::OW | Phoneme::OY
-                | Phoneme::UH | Phoneme::UW
+            Phoneme::AA
+                | Phoneme::AE
+                | Phoneme::AH
+                | Phoneme::AO
+                | Phoneme::AW
+                | Phoneme::AY
+                | Phoneme::EH
+                | Phoneme::ER
+                | Phoneme::EY
+                | Phoneme::IH
+                | Phoneme::IY
+                | Phoneme::OW
+                | Phoneme::OY
+                | Phoneme::UH
+                | Phoneme::UW
         )
     }
 
     /// Rough intrinsic duration in frames (10 ms) for fallback spacing.
     pub fn typical_frames(self) -> usize {
         if self.is_vowel() {
-            if matches!(self, Phoneme::AW | Phoneme::AY | Phoneme::EY | Phoneme::OW | Phoneme::OY) {
+            if matches!(
+                self,
+                Phoneme::AW | Phoneme::AY | Phoneme::EY | Phoneme::OW | Phoneme::OY
+            ) {
                 12 // diphthongs
             } else {
                 9
@@ -147,9 +224,7 @@ const LEXICON: &[(&str, &str)] = &[
 fn lexicon() -> HashMap<&'static str, Vec<Phoneme>> {
     LEXICON
         .iter()
-        .map(|(w, phones)| {
-            (*w, phones.split(' ').map(parse_phoneme).collect::<Vec<_>>())
-        })
+        .map(|(w, phones)| (*w, phones.split(' ').map(parse_phoneme).collect::<Vec<_>>()))
         .collect()
 }
 
@@ -163,16 +238,46 @@ fn parse_phoneme(s: &str) -> Phoneme {
 }
 
 const PHONEME_NAMES: &[(&str, Phoneme)] = &[
-    ("AA", Phoneme::AA), ("AE", Phoneme::AE), ("AH", Phoneme::AH), ("AO", Phoneme::AO),
-    ("AW", Phoneme::AW), ("AY", Phoneme::AY), ("EH", Phoneme::EH), ("ER", Phoneme::ER),
-    ("EY", Phoneme::EY), ("IH", Phoneme::IH), ("IY", Phoneme::IY), ("OW", Phoneme::OW),
-    ("OY", Phoneme::OY), ("UH", Phoneme::UH), ("UW", Phoneme::UW), ("B", Phoneme::B),
-    ("CH", Phoneme::CH), ("D", Phoneme::D), ("DH", Phoneme::DH), ("F", Phoneme::F),
-    ("G", Phoneme::G), ("HH", Phoneme::HH), ("JH", Phoneme::JH), ("K", Phoneme::K),
-    ("L", Phoneme::L), ("M", Phoneme::M), ("N", Phoneme::N), ("NG", Phoneme::NG),
-    ("P", Phoneme::P), ("R", Phoneme::R), ("S", Phoneme::S), ("SH", Phoneme::SH),
-    ("T", Phoneme::T), ("TH", Phoneme::TH), ("V", Phoneme::V), ("W", Phoneme::W),
-    ("Y", Phoneme::Y), ("Z", Phoneme::Z), ("ZH", Phoneme::ZH), ("SIL", Phoneme::SIL),
+    ("AA", Phoneme::AA),
+    ("AE", Phoneme::AE),
+    ("AH", Phoneme::AH),
+    ("AO", Phoneme::AO),
+    ("AW", Phoneme::AW),
+    ("AY", Phoneme::AY),
+    ("EH", Phoneme::EH),
+    ("ER", Phoneme::ER),
+    ("EY", Phoneme::EY),
+    ("IH", Phoneme::IH),
+    ("IY", Phoneme::IY),
+    ("OW", Phoneme::OW),
+    ("OY", Phoneme::OY),
+    ("UH", Phoneme::UH),
+    ("UW", Phoneme::UW),
+    ("B", Phoneme::B),
+    ("CH", Phoneme::CH),
+    ("D", Phoneme::D),
+    ("DH", Phoneme::DH),
+    ("F", Phoneme::F),
+    ("G", Phoneme::G),
+    ("HH", Phoneme::HH),
+    ("JH", Phoneme::JH),
+    ("K", Phoneme::K),
+    ("L", Phoneme::L),
+    ("M", Phoneme::M),
+    ("N", Phoneme::N),
+    ("NG", Phoneme::NG),
+    ("P", Phoneme::P),
+    ("R", Phoneme::R),
+    ("S", Phoneme::S),
+    ("SH", Phoneme::SH),
+    ("T", Phoneme::T),
+    ("TH", Phoneme::TH),
+    ("V", Phoneme::V),
+    ("W", Phoneme::W),
+    ("Y", Phoneme::Y),
+    ("Z", Phoneme::Z),
+    ("ZH", Phoneme::ZH),
+    ("SIL", Phoneme::SIL),
 ];
 
 /// Converts one word to phonemes. Non-alphabetic characters are skipped.
@@ -193,13 +298,21 @@ pub fn g2p_word(word: &str) -> Vec<Phoneme> {
     let mut igh = false;
     let n = letters.len();
     let at = |idx: usize| -> Option<char> { letters.get(idx).copied() };
-    let prev_is_vowel_letter = |idx: usize| idx > 0 && matches!(letters[idx - 1], 'a' | 'e' | 'i' | 'o' | 'u');
-    let next_letter_is_vowel = |idx: usize| {
-        at(idx + 1).map_or(false, |c| matches!(c, 'a' | 'e' | 'i' | 'o' | 'u' | 'y'))
-    };
+    let prev_is_vowel_letter =
+        |idx: usize| idx > 0 && matches!(letters[idx - 1], 'a' | 'e' | 'i' | 'o' | 'u');
+    let next_letter_is_vowel =
+        |idx: usize| at(idx + 1).is_some_and(|c| matches!(c, 'a' | 'e' | 'i' | 'o' | 'u' | 'y'));
 
     while i < n {
         let c = letters[i];
+        // Doubled consonants (pp, ll, ss, …) sound once; doubled
+        // vowels at the word end (see) were consumed by their first
+        // half's rule.
+        let is_vowel_letter = matches!(c, 'a' | 'e' | 'i' | 'o' | 'u');
+        if i > 0 && letters[i - 1] == c && (!is_vowel_letter || i == n - 1) {
+            i += 1;
+            continue;
+        }
         let next = at(i + 1);
         let two: Option<String> = next.map(|n2| format!("{c}{n2}"));
 
@@ -226,11 +339,9 @@ pub fn g2p_word(word: &str) -> Vec<Phoneme> {
 
         let emitted: Vec<Phoneme> = match c {
             'a' => {
-                // magic-e: "a_e" → EY (cake)
-                if at(i + 2) == Some('e') && next.map_or(true, |c2| !matches!(c2, 'a' | 'e' | 'i' | 'o' | 'u')) && at(i + 1).is_some() {
+                // magic-e ("cake") and open syllables ("paper") → long A.
+                if (at(i + 2) == Some('e') && at(i + 1).is_some()) || next_letter_is_vowel(i) {
                     vec![Phoneme::EY]
-                } else if next_letter_is_vowel(i) {
-                    vec![Phoneme::EY] // open syllable (paper)
                 } else {
                     vec![Phoneme::AE]
                 }
@@ -249,19 +360,17 @@ pub fn g2p_word(word: &str) -> Vec<Phoneme> {
                 if at(i + 1) == Some('g') && at(i + 2) == Some('h') {
                     igh = true;
                     vec![Phoneme::AY]
-                } else if i + 3 == n && at(i + 1) == Some('n') && at(i + 2) == Some('d') {
-                    vec![Phoneme::AY] // -ind → AY (find)
-                } else if at(i + 2) == Some('e') {
-                    vec![Phoneme::AY] // i_e (like)
+                } else if (i + 3 == n && at(i + 1) == Some('n') && at(i + 2) == Some('d'))
+                    || at(i + 2) == Some('e')
+                {
+                    vec![Phoneme::AY] // -ind (find) and i_e (like)
                 } else {
                     vec![Phoneme::IH]
                 }
             }
             'o' => {
-                if at(i + 2) == Some('e') {
-                    vec![Phoneme::OW] // o_e (home)
-                } else if next == Some('w') || next == Some('a') {
-                    vec![Phoneme::OW] // ow/oa → OW (most handled by lexicon)
+                if at(i + 2) == Some('e') || next == Some('w') || next == Some('a') {
+                    vec![Phoneme::OW] // o_e (home), ow/oa digraphs
                 } else {
                     vec![Phoneme::AA]
                 }

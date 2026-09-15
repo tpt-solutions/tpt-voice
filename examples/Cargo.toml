@@ -32,3 +32,7 @@ path = "diarize_meeting.rs"
 [[example]]
 name = "text_based_edit"
 path = "text_based_edit.rs"
+
+[[example]]
+name = "benchmark"
+path = "benchmark.rs"

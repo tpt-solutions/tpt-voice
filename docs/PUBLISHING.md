@@ -7,6 +7,7 @@ crate compiles, so the namespace is squatted before the 1.0 release:
 
 | Crate | Role |
 | :--- | :--- |
+| `tpt-voice` | one-crate facade (prelude, pipeline, editing glue) |
 | `tpt-av-voice-utils` | shared types/kernels |
 | `tpt-av-voice-transcribe` | ASR |
 | `tpt-av-voice-isolate` | voice separation |
@@ -22,7 +23,7 @@ patch, per Cargo's 0.x semantics).
 
 - **Code crates:** published to crates.io from CI (tag-triggered
   `cargo publish` in dependency order: utils → transcribe/isolate/diarize/
-  align/tts → nothing else; `examples/` is `publish = false`).
+  align/tts → the `tpt-voice` facade last; `examples/` is `publish = false`).
 - **Model weights:** *never* published to crates.io. Weights are
   version-checked artifacts distributed via GitHub Releases
   (`https://github.com/tpt-solutions/tpt-voice/releases/tag/models-vN`),

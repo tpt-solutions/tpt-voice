@@ -19,7 +19,10 @@ pub struct Rng {
 impl Rng {
     /// Seeds the generator. `seed == 0` is remapped to a non-zero state.
     pub fn new(seed: u64) -> Self {
-        Rng { state: if seed == 0 { 0x9E3779B97F4A7C15 } else { seed }, normal_cache: None }
+        Rng {
+            state: if seed == 0 { 0x9E3779B97F4A7C15 } else { seed },
+            normal_cache: None,
+        }
     }
 
     /// Next raw 64-bit value.
@@ -61,7 +64,10 @@ pub fn matvec(a: ndarray::ArrayView2<f32>, x: &[f32]) -> Vec<f32> {
     assert_eq!(a.ncols(), x.len(), "matvec shape mismatch");
     let mut out = Vec::with_capacity(a.nrows());
     for row in a.rows() {
-        out.push(crate::simd::dot(row.as_slice().expect("matrix row contiguous"), x));
+        out.push(crate::simd::dot(
+            row.as_slice().expect("matrix row contiguous"),
+            x,
+        ));
     }
     out
 }
@@ -94,7 +100,11 @@ pub fn matmul(a: ndarray::ArrayView2<f32>, b: ndarray::ArrayView2<f32>) -> Array
 /// without materializing the transpose. Every row touched is contiguous,
 /// so the inner loops drive [`crate::simd::dot`].
 pub fn matmul_t(x: ndarray::ArrayView2<f32>, w: ndarray::ArrayView2<f32>) -> Array2<f32> {
-    assert_eq!(x.ncols(), w.ncols(), "matmul_t shape mismatch: x is (M,K), w must be (N,K)");
+    assert_eq!(
+        x.ncols(),
+        w.ncols(),
+        "matmul_t shape mismatch: x is (M,K), w must be (N,K)"
+    );
     let mut out = Array2::<f32>::zeros((x.nrows(), w.nrows()));
     for (mut out_row, x_row) in out.rows_mut().into_iter().zip(x.rows()) {
         let xs = x_row.as_slice().expect("x row contiguous");
@@ -118,7 +128,11 @@ fn matmul_std(a: ndarray::ArrayView2<f32>, b: ndarray::ArrayView2<f32>) -> Array
         for kk in 0..k {
             let a_ik = a[[i, kk]];
             if a_ik != 0.0 {
-                crate::simd::axpy(b.row(kk).as_slice().expect("b row contiguous"), a_ik, out_slice);
+                crate::simd::axpy(
+                    b.row(kk).as_slice().expect("b row contiguous"),
+                    a_ik,
+                    out_slice,
+                );
             }
         }
     }
@@ -135,14 +149,20 @@ pub struct Linear {
 impl Linear {
     /// Builds a layer from weight/bias arrays.
     pub fn new(weight: Array2<f32>, bias: Array1<f32>) -> Self {
-        assert_eq!(weight.nrows(), bias.len(), "bias length must match out_features");
+        assert_eq!(
+            weight.nrows(),
+            bias.len(),
+            "bias length must match out_features"
+        );
         Linear { weight, bias }
     }
 
     /// Xavier-uniform initialization for reproducible pipelines.
     pub fn with_init(rng: &mut Rng, in_features: usize, out_features: usize) -> Self {
         let limit = (6.0 / (in_features + out_features) as f32).sqrt();
-        let weight = Array2::from_shape_fn((out_features, in_features), |_| rng.uniform_range(-limit, limit));
+        let weight = Array2::from_shape_fn((out_features, in_features), |_| {
+            rng.uniform_range(-limit, limit)
+        });
         let bias = Array1::zeros(out_features);
         Linear { weight, bias }
     }
@@ -168,12 +188,20 @@ pub struct LayerNorm {
 impl LayerNorm {
     pub fn new(scale: Array1<f32>, bias: Array1<f32>) -> Self {
         assert_eq!(scale.len(), bias.len());
-        LayerNorm { scale, bias, eps: 1e-5 }
+        LayerNorm {
+            scale,
+            bias,
+            eps: 1e-5,
+        }
     }
 
     /// Unit scale, zero bias.
     pub fn unit(dim: usize) -> Self {
-        LayerNorm { scale: Array1::ones(dim), bias: Array1::zeros(dim), eps: 1e-5 }
+        LayerNorm {
+            scale: Array1::ones(dim),
+            bias: Array1::zeros(dim),
+            eps: 1e-5,
+        }
     }
 
     /// `(T, d) → (T, d)`, normalizing each row.
@@ -220,7 +248,7 @@ impl Embedding {
 /// GELU activation (tanh approximation, as used by Whisper/GPT).
 pub fn gelu(x: &Array2<f32>) -> Array2<f32> {
     x.mapv(|v| {
-        0.5 * v * (1.0 + (0.797_884_560_8 * (v + 0.044715 * v * v * v)).tanh())
+        0.5 * v * (1.0 + (std::f32::consts::FRAC_2_SQRT_PI * (v + 0.044715 * v * v * v)).tanh())
     })
 }
 
@@ -267,15 +295,24 @@ pub struct Conv1d {
 
 impl Conv1d {
     pub fn new(weight: Array3<f32>, bias: Array1<f32>) -> Self {
-        Conv1d { weight, bias, stride: 1 }
+        Conv1d {
+            weight,
+            bias,
+            stride: 1,
+        }
     }
 
     /// Xavier-uniform init.
     pub fn with_init(rng: &mut Rng, in_c: usize, out_c: usize, kernel: usize) -> Self {
         let limit = (6.0 / ((in_c + out_c) * kernel) as f32).sqrt();
-        let weight = Array3::from_shape_fn((out_c, in_c, kernel), |_| rng.uniform_range(-limit, limit));
+        let weight =
+            Array3::from_shape_fn((out_c, in_c, kernel), |_| rng.uniform_range(-limit, limit));
         let bias = Array1::zeros(out_c);
-        Conv1d { weight, bias, stride: 1 }
+        Conv1d {
+            weight,
+            bias,
+            stride: 1,
+        }
     }
 
     /// `(in_c, T) → (out_c, T_out)` with `same` padding.
@@ -322,7 +359,8 @@ impl Conv2d {
     /// Xavier-uniform init.
     pub fn with_init(rng: &mut Rng, in_c: usize, out_c: usize, kh: usize, kw: usize) -> Self {
         let limit = (6.0 / ((in_c + out_c) * kh * kw) as f32).sqrt();
-        let weight = Array4::from_shape_fn((out_c, in_c, kh, kw), |_| rng.uniform_range(-limit, limit));
+        let weight =
+            Array4::from_shape_fn((out_c, in_c, kh, kw), |_| rng.uniform_range(-limit, limit));
         let bias = Array1::zeros(out_c);
         Conv2d { weight, bias }
     }
@@ -348,7 +386,8 @@ impl Conv2d {
                                 if wi < 0 || wi as usize >= w {
                                     continue;
                                 }
-                                sum += self.weight[[oc, ic, kh_i, kw_i]] * x[[ic, hi as usize, wi as usize]];
+                                sum += self.weight[[oc, ic, kh_i, kw_i]]
+                                    * x[[ic, hi as usize, wi as usize]];
                             }
                         }
                     }

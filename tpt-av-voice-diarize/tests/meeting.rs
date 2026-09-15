@@ -32,13 +32,29 @@ fn meeting_is_segmented_by_speaker_and_annotates_transcript() {
     let mut diarizer = Diarizer::classical(DiarizerConfig::default()).unwrap();
     let result = diarizer.diarize_samples(&pcm, 16_000).unwrap();
     assert_eq!(result.num_speakers, 2, "got: {result:?}");
-    assert!(result.segments.len() >= 3, "alternation must produce ≥3 segments");
-    assert_eq!(result.segments[0].speaker.id, result.segments.last().unwrap().speaker.id);
+    assert!(
+        result.segments.len() >= 3,
+        "alternation must produce ≥3 segments"
+    );
+    assert_eq!(
+        result.segments[0].speaker.id,
+        result.segments.last().unwrap().speaker.id
+    );
 
     // Link to a transcript with one segment per speech burst.
     let mut transcript = Transcript::new("en");
-    transcript.push_segment(TranscriptSegment::new(0.2, 1.4, "good morning everyone", 1.0));
-    transcript.push_segment(TranscriptSegment::new(2.2, 3.4, "morning! coffee is ready", 1.0));
+    transcript.push_segment(TranscriptSegment::new(
+        0.2,
+        1.4,
+        "good morning everyone",
+        1.0,
+    ));
+    transcript.push_segment(TranscriptSegment::new(
+        2.2,
+        3.4,
+        "morning! coffee is ready",
+        1.0,
+    ));
     transcript.push_segment(TranscriptSegment::new(4.4, 5.6, "thanks for coming", 1.0));
     let annotated = annotate_transcript(&mut transcript, &result).unwrap();
     assert_eq!(annotated, 3);

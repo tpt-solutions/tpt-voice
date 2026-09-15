@@ -24,7 +24,11 @@ pub struct StreamDiarizerConfig {
 
 impl Default for StreamDiarizerConfig {
     fn default() -> Self {
-        StreamDiarizerConfig { window_secs: 1.5, hop_secs: 0.75, join_threshold: 0.9 }
+        StreamDiarizerConfig {
+            window_secs: 1.5,
+            hop_secs: 0.75,
+            join_threshold: 0.9,
+        }
     }
 }
 
@@ -54,7 +58,6 @@ pub struct StreamingDiarizer {
 /// Candidate for a new speaker awaiting confirmation.
 struct PendingWindow {
     embedding: Vec<f32>,
-    distance: f32,
 }
 
 impl StreamingDiarizer {
@@ -91,8 +94,15 @@ impl StreamingDiarizer {
     pub fn classical(diarizer: &DiarizerConfig) -> Result<Self, VoiceError> {
         // Same calibration as the batch classical mode: classical
         // embeddings sit at ~0.001 within a speaker and ~0.05+ across.
-        let stream = StreamDiarizerConfig { join_threshold: 0.03, ..Default::default() };
-        Self::new(Box::new(crate::embedding::ClassicalEmbedding), stream, diarizer)
+        let stream = StreamDiarizerConfig {
+            join_threshold: 0.03,
+            ..Default::default()
+        };
+        Self::new(
+            Box::new(crate::embedding::ClassicalEmbedding),
+            stream,
+            diarizer,
+        )
     }
 
     /// Speakers discovered so far.
@@ -110,7 +120,9 @@ impl StreamingDiarizer {
     /// segment once processed.
     pub fn push(&mut self, chunk: &AudioChunk) -> Result<Option<SpeakerSegment>, VoiceError> {
         if chunk.sample_rate != 16_000 {
-            return Err(VoiceError::config("streaming diarizer expects 16 kHz chunks"));
+            return Err(VoiceError::config(
+                "streaming diarizer expects 16 kHz chunks",
+            ));
         }
         if self.buffer.is_empty() {
             self.buffer_start = chunk.start_time;
@@ -168,7 +180,7 @@ impl StreamingDiarizer {
             }
             // Far from everything, but a previous window was far in the
             // same way: confirm a new speaker.
-            _ if self.pending.as_ref().map_or(false, |p| {
+            _ if self.pending.as_ref().is_some_and(|p| {
                 cosine_distance(embedding, &p.embedding) <= self.stream.join_threshold
             }) && self.centroids.len() < max_speakers =>
             {
@@ -187,7 +199,6 @@ impl StreamingDiarizer {
             _ => {
                 self.pending = Some(PendingWindow {
                     embedding: embedding.to_vec(),
-                    distance: nearest.map_or(f32::INFINITY, |(_, d)| d),
                 });
                 let (label, d) = nearest.unwrap_or((0, 1.0));
                 self.last_distance = d;
@@ -256,7 +267,11 @@ mod tests {
                 labels.push(seg.speaker.index().unwrap());
             }
         }
-        assert!(stream.num_speakers() == 2, "speakers: {}", stream.num_speakers());
+        assert!(
+            stream.num_speakers() == 2,
+            "speakers: {}",
+            stream.num_speakers()
+        );
         // First windows are speaker 0, later windows speaker 1.
         assert_eq!(labels[0], 0);
         assert_eq!(*labels.last().unwrap(), 1);
@@ -265,8 +280,15 @@ mod tests {
     #[test]
     fn rejects_bad_config() {
         let cfg = DiarizerConfig::default();
-        let bad = StreamDiarizerConfig { hop_secs: 2.0, window_secs: 1.0, ..Default::default() };
-        assert!(StreamingDiarizer::new(Box::new(crate::embedding::ClassicalEmbedding), bad, &cfg).is_err());
+        let bad = StreamDiarizerConfig {
+            hop_secs: 2.0,
+            window_secs: 1.0,
+            ..Default::default()
+        };
+        assert!(
+            StreamingDiarizer::new(Box::new(crate::embedding::ClassicalEmbedding), bad, &cfg)
+                .is_err()
+        );
     }
 
     #[test]

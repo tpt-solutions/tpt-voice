@@ -10,14 +10,17 @@
 //!
 //! Pipeline: `audio → STFT → mask prediction → masked STFT → ISTFT → voice`.
 
-pub mod istft;
 pub mod isolator;
+pub mod istft;
 pub mod mask;
 pub mod model;
 pub mod stft;
 pub mod streaming;
 
-pub use istft::Istft;
 pub use isolator::{IsolatedAudio, IsolatorConfig, SourceType, VoiceIsolator};
+pub use istft::Istft;
 pub use stft::{Stft, StftConfig};
 pub use streaming::StreamingIsolator;
+
+// Convenience re-exports for one-dependency usage.
+pub use tpt_av_voice_utils::{wav, AudioChunk, VoiceError};

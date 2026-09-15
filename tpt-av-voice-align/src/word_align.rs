@@ -38,16 +38,40 @@ pub fn words_from_phoneme_alignment(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::forced_align::{ctc_align, AlignmentUnit};
+    use crate::forced_align::{ctc_align, AlignmentUnit, UnitTiming};
     use ndarray::Array2;
 
     fn manual_alignment() -> ForcedAlignment {
         ForcedAlignment {
             units: vec![
-                UnitTiming { unit_index: 0, label: 1, word_index: 0, start_frame: 0, end_frame: 3 },
-                UnitTiming { unit_index: 1, label: 2, word_index: 0, start_frame: 4, end_frame: 6 },
-                UnitTiming { unit_index: 2, label: 3, word_index: 1, start_frame: 8, end_frame: 9 },
-                UnitTiming { unit_index: 3, label: 4, word_index: 1, start_frame: 10, end_frame: 14 },
+                UnitTiming {
+                    unit_index: 0,
+                    label: 1,
+                    word_index: 0,
+                    start_frame: 0,
+                    end_frame: 3,
+                },
+                UnitTiming {
+                    unit_index: 1,
+                    label: 2,
+                    word_index: 0,
+                    start_frame: 4,
+                    end_frame: 6,
+                },
+                UnitTiming {
+                    unit_index: 2,
+                    label: 3,
+                    word_index: 1,
+                    start_frame: 8,
+                    end_frame: 9,
+                },
+                UnitTiming {
+                    unit_index: 3,
+                    label: 4,
+                    word_index: 1,
+                    start_frame: 10,
+                    end_frame: 14,
+                },
             ],
             score: -1.0,
         }
@@ -68,11 +92,12 @@ mod tests {
     #[test]
     fn repeated_words_stay_separate() {
         let mut a = manual_alignment();
-        a.units[2].word_index = 2; // "hi" again
-        a.units[3].word_index = 2;
+        a.units[2].word_index = 1; // "and"
+        a.units[3].word_index = 2; // "hi" again
         let timings = words_from_phoneme_alignment(&a, &["hi", "and", "hi"], 0.01);
         assert_eq!(timings.len(), 3);
         assert_eq!(timings[0].word, "hi");
+        assert_eq!(timings[1].word, "and");
         assert_eq!(timings[2].word, "hi");
         assert!(timings[2].start_time > timings[0].end_time);
     }

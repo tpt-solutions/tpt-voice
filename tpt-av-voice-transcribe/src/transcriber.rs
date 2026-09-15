@@ -10,7 +10,7 @@ use tpt_av_voice_utils::{Language, Transcript, TranscriptSegment, VoiceError};
 use crate::decoder::{DecodeConfig, Decoder, GreedyDecoder};
 use crate::encoder::{MelConfig, MelFrontend};
 use crate::model::{AsrModel, AsrModelConfig};
-use crate::tokenizer::{BpeTokenizer, SOT, Tokenizer};
+use crate::tokenizer::{BpeTokenizer, Tokenizer, SOT};
 
 /// User-tunable transcription settings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,6 +58,15 @@ impl Transcriber {
     /// Loads a model directory (see [`crate::weights`] for the layout).
     pub fn from_model_dir(dir: impl AsRef<Path>) -> Result<Self, VoiceError> {
         let dir = dir.as_ref();
+        // If the export shipped an integrity manifest, honor it: any
+        // drift (corruption, tampering, partial download) is rejected
+        // before inference.
+        if dir
+            .join(tpt_av_voice_utils::manifest::MANIFEST_FILE)
+            .exists()
+        {
+            tpt_av_voice_utils::manifest::verify_manifest(dir)?;
+        }
         let tensors = crate::weights::load_model_weights(dir)?;
         let config_json = std::fs::read_to_string(dir.join("config.json"))?;
         let model_config: AsrModelConfig = serde_json::from_str(&config_json)
@@ -99,6 +108,12 @@ impl Transcriber {
         self
     }
 
+    /// Mutates the settings in place (useful behind shared ownership or
+    /// inside pipelines).
+    pub fn set_config(&mut self, config: TranscriberConfig) {
+        self.config = config;
+    }
+
     /// Transcribes a WAV file (mono downmix; resampled to 16 kHz if needed).
     pub fn transcribe_file(&self, path: impl AsRef<Path>) -> Result<Transcript, VoiceError> {
         let wav = tpt_av_voice_utils::wav::read_wav_file(path)?;
@@ -107,7 +122,11 @@ impl Transcriber {
     }
 
     /// Transcribes mono PCM samples at any sample rate.
-    pub fn transcribe_samples(&self, samples: &[f32], sample_rate: u32) -> Result<Transcript, VoiceError> {
+    pub fn transcribe_samples(
+        &self,
+        samples: &[f32],
+        sample_rate: u32,
+    ) -> Result<Transcript, VoiceError> {
         let pcm = resample_linear(samples, sample_rate, 16_000);
         let mut transcript = Transcript::new(self.config.language.code());
         let mut start_sample = 0usize;
@@ -193,7 +212,11 @@ impl Transcriber {
             total += exps[tok.min(exps.len() - 1)] / sum;
             count += 1;
         }
-        if count == 0 { 0.0 } else { total / count as f32 }
+        if count == 0 {
+            0.0
+        } else {
+            total / count as f32
+        }
     }
 
     /// Borrows the tokenizer (e.g. for prompt construction).

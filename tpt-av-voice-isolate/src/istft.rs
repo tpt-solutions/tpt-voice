@@ -23,7 +23,11 @@ pub struct Istft {
 impl Istft {
     pub fn new(config: StftConfig) -> Result<Self, VoiceError> {
         config.validate()?;
-        Ok(Istft { fft: RealFft::new(config.n_fft), window: hann_window(config.n_fft), config })
+        Ok(Istft {
+            fft: RealFft::new(config.n_fft),
+            window: hann_window(config.n_fft),
+            config,
+        })
     }
 
     /// Reconstructs `out_len` samples from a `(n_frames, n_bins)`

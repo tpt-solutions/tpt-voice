@@ -35,11 +35,7 @@ pub fn rms(samples: &[f32]) -> f32 {
 
 /// Slices `signal` into overlapping frames of `frame_len` samples advanced
 /// by `hop` samples. The tail shorter than `frame_len` is dropped.
-pub fn frames<'a>(
-    signal: &'a [f32],
-    frame_len: usize,
-    hop: usize,
-) -> impl Iterator<Item = &'a [f32]> {
+pub fn frames(signal: &[f32], frame_len: usize, hop: usize) -> impl Iterator<Item = &[f32]> {
     debug_assert!(frame_len > 0 && hop > 0);
     signal.windows(frame_len).step_by(hop)
 }
@@ -84,7 +80,12 @@ impl RealFft {
     /// returning the real output scaled by `1/n` (i.e. properly
     /// normalized so `inverse(forward(x)) == x`).
     pub fn inverse_half(&self, half: &[rustfft::num_complex::Complex<f32>]) -> Vec<f32> {
-        assert!(half.len() == self.n / 2 + 1, "expected {} bins, got {}", self.n / 2 + 1, half.len());
+        assert!(
+            half.len() == self.n / 2 + 1,
+            "expected {} bins, got {}",
+            self.n / 2 + 1,
+            half.len()
+        );
         let mut buf = vec![rustfft::num_complex::Complex::new(0.0, 0.0); self.n];
         buf[..half.len()].copy_from_slice(half);
         // Hermitian mirror: X[n-k] = conj(X[k]).
@@ -118,7 +119,11 @@ pub fn mel_filterbank(
     f_max: f32,
 ) -> Vec<Vec<f32>> {
     let n_bins = n_fft / 2 + 1;
-    let f_max = if f_max <= f_min { sample_rate as f32 / 2.0 } else { f_max };
+    let f_max = if f_max <= f_min {
+        sample_rate as f32 / 2.0
+    } else {
+        f_max
+    };
     let mel_min = hz_to_mel(f_min);
     let mel_max = hz_to_mel(f_max);
     // n_mels + 2 boundary points, evenly spaced in mel.
@@ -168,7 +173,9 @@ pub fn dct_ii(input: &[f32]) -> Vec<f32> {
             input
                 .iter()
                 .enumerate()
-                .map(|(n, &x)| x * (std::f32::consts::PI * k as f32 * (n as f32 + 0.5) / m as f32).cos())
+                .map(|(n, &x)| {
+                    x * (std::f32::consts::PI * k as f32 * (n as f32 + 0.5) / m as f32).cos()
+                })
                 .sum::<f32>()
         })
         .collect()
@@ -249,8 +256,7 @@ pub fn mfcc(signal: &[f32], config: &MfccConfig) -> Result<Vec<Vec<f32>>, crate:
 
     let mut out = Vec::new();
     for frame in frames(&emph, config.frame_len, config.hop) {
-        let windowed: Vec<f32> =
-            frame.iter().zip(&window).map(|(s, w)| s * w).collect();
+        let windowed: Vec<f32> = frame.iter().zip(&window).map(|(s, w)| s * w).collect();
         let spectrum = fft.forward(&windowed);
         let power: Vec<f32> = spectrum[..n_fft / 2 + 1]
             .iter()
@@ -410,6 +416,6 @@ mod tests {
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
             .unwrap()
             .0;
-        assert_eq!(peak, 56, "440 Hz @ 16 kHz → bin 56");
+        assert_eq!(peak, 28, "440 Hz @ 16 kHz over 1024 samples → bin 28");
     }
 }

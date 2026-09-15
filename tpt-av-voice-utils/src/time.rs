@@ -35,7 +35,10 @@ pub struct TimeRange {
 impl TimeRange {
     /// Creates a new range. `start` is clamped so it never exceeds `end`.
     pub fn new(start: f64, end: f64) -> Self {
-        TimeRange { start: start.min(end), end }
+        TimeRange {
+            start: start.min(end),
+            end,
+        }
     }
 
     /// Duration of the range in seconds.

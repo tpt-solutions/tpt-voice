@@ -21,7 +21,12 @@ pub struct AudioChunk {
 impl AudioChunk {
     /// Creates a chunk starting at `start_time`.
     pub fn new(samples: Vec<f32>, sample_rate: u32, start_time: f64, sequence: u64) -> Self {
-        AudioChunk { samples, sample_rate, start_time, sequence }
+        AudioChunk {
+            samples,
+            sample_rate,
+            start_time,
+            sequence,
+        }
     }
 
     /// Number of samples in the chunk.
@@ -73,14 +78,22 @@ impl AudioChunk {
     /// # Panics
     /// Panics if sample rates differ — mixing rates is a programmer error.
     pub fn append(&mut self, other: AudioChunk) {
-        assert_eq!(self.sample_rate, other.sample_rate, "cannot append chunks with different sample rates");
+        assert_eq!(
+            self.sample_rate, other.sample_rate,
+            "cannot append chunks with different sample rates"
+        );
         self.samples.extend_from_slice(&other.samples);
     }
 }
 
 impl Default for AudioChunk {
     fn default() -> Self {
-        AudioChunk { samples: Vec::new(), sample_rate: crate::time::TARGET_SAMPLE_RATE, start_time: 0.0, sequence: 0 }
+        AudioChunk {
+            samples: Vec::new(),
+            sample_rate: crate::time::TARGET_SAMPLE_RATE,
+            start_time: 0.0,
+            sequence: 0,
+        }
     }
 }
 

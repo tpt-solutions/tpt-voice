@@ -112,7 +112,10 @@ impl fmt::Display for AudioError {
             }
             AudioError::InvalidFormat(msg) => write!(f, "invalid audio format: {msg}"),
             AudioError::SampleRateMismatch { expected, actual } => {
-                write!(f, "sample rate mismatch: expected {expected} Hz, got {actual} Hz")
+                write!(
+                    f,
+                    "sample rate mismatch: expected {expected} Hz, got {actual} Hz"
+                )
             }
             AudioError::Empty => write!(f, "audio input is empty"),
         }

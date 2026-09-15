@@ -73,7 +73,11 @@ impl BpeTokenizer {
         serde_json::to_string(&file).expect("tokenizer serialization cannot fail")
     }
 
-    fn build(vocab: Vec<String>, merges: Vec<String>, specials: Vec<String>) -> Result<Self, VoiceError> {
+    fn build(
+        vocab: Vec<String>,
+        merges: Vec<String>,
+        specials: Vec<String>,
+    ) -> Result<Self, VoiceError> {
         let mut ids_map = HashMap::new();
         let mut ids = Vec::new();
         for (id, tok) in vocab.into_iter().enumerate() {
@@ -129,7 +133,9 @@ impl BpeTokenizer {
     /// `vocab_size` tokens (two specials reserved).
     pub fn train(corpus: &str, vocab_size: usize) -> Result<Self, VoiceError> {
         if vocab_size < 300 {
-            return Err(VoiceError::config("vocab_size must reserve 256 byte tokens + specials"));
+            return Err(VoiceError::config(
+                "vocab_size must reserve 256 byte tokens + specials",
+            ));
         }
         // Word frequency over whitespace-split words.
         let mut word_freqs: HashMap<String, usize> = HashMap::new();
@@ -147,7 +153,11 @@ impl BpeTokenizer {
             .into_iter()
             .map(|(w, f)| {
                 let mut syms: Vec<String> = vec!["Ġ".to_string()];
-                syms.extend(w.as_bytes().iter().map(|&b| byte_encoder[b as usize].to_string()));
+                syms.extend(
+                    w.as_bytes()
+                        .iter()
+                        .map(|&b| byte_encoder[b as usize].to_string()),
+                );
                 (syms, f)
             })
             .collect();
@@ -166,17 +176,19 @@ impl BpeTokenizer {
             let mut pair_freqs: HashMap<(String, String), usize> = HashMap::new();
             for (syms, freq) in &words {
                 for pair in syms.windows(2) {
-                    *pair_freqs.entry((pair[0].clone(), pair[1].clone())).or_default() += *freq;
+                    *pair_freqs
+                        .entry((pair[0].clone(), pair[1].clone()))
+                        .or_default() += *freq;
                 }
             }
             // Deterministic pick: highest frequency, ties broken
             // lexicographically by the pair.
             let mut candidates: Vec<((String, String), usize)> =
                 pair_freqs.into_iter().filter(|(_, f)| *f > 1).collect();
-            candidates.sort_by(|(a, fa), (b, fb)| {
-                fb.cmp(fa).then_with(|| a.cmp(b))
-            });
-            let Some(((a, b), _)) = candidates.first() else { break };
+            candidates.sort_by(|(a, fa), (b, fb)| fb.cmp(fa).then_with(|| a.cmp(b)));
+            let Some(((a, b), _)) = candidates.first() else {
+                break;
+            };
             let (a, b) = (a.clone(), b.clone());
             // Merge the pair everywhere.
             for (syms, _) in words.iter_mut() {
@@ -241,7 +253,9 @@ impl Tokenizer for BpeTokenizer {
         // UTF-8 — this round-trips any original text exactly.
         let mut bytes: Vec<u8> = Vec::new();
         for &id in tokens {
-            let Some(tok) = self.ids.get(id) else { continue };
+            let Some(tok) = self.ids.get(id) else {
+                continue;
+            };
             if self.specials.iter().any(|sp| sp == tok) {
                 continue;
             }
@@ -338,7 +352,13 @@ mod tests {
     #[test]
     fn round_trip_arbitrary_text() {
         let tok = trained();
-        for text in ["", "the quick fox", "héllo wörld 你好", "  leading spaces", "tabs\tand\nnewlines"] {
+        for text in [
+            "",
+            "the quick fox",
+            "héllo wörld 你好",
+            "  leading spaces",
+            "tabs\tand\nnewlines",
+        ] {
             let ids = tok.encode(text);
             assert!(ids.iter().all(|&i| i < tok.vocab_size()));
             let decoded = tok.decode(&ids);
@@ -351,7 +371,10 @@ mod tests {
         let tok = trained();
         let ids = tok.encode(&format!("hello {EOT} world"));
         assert!(ids.contains(&tok.token_to_id(EOT).unwrap()));
-        assert!(!tok.decode(&ids).contains('<'), "specials are not spelled out");
+        assert!(
+            !tok.decode(&ids).contains('<'),
+            "specials are not spelled out"
+        );
     }
 
     #[test]

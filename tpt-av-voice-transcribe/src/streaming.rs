@@ -10,6 +10,7 @@
 //! use tpt_av_voice_utils::AudioChunk;
 //! use tpt_av_voice_transcribe::{StreamingTranscriber, Transcriber};
 //!
+//! # let audio_chunks: Vec<AudioChunk> = Vec::new();
 //! # let transcriber = Transcriber::from_model_dir("models/en-small").unwrap();
 //! let mut stream = StreamingTranscriber::new(transcriber);
 //! for chunk in audio_chunks {
@@ -37,7 +38,11 @@ pub struct StreamConfig {
 
 impl Default for StreamConfig {
     fn default() -> Self {
-        StreamConfig { silence_rms: 0.004, min_silence_secs: 0.5, max_buffer_secs: 30.0 }
+        StreamConfig {
+            silence_rms: 0.004,
+            min_silence_secs: 0.5,
+            max_buffer_secs: 30.0,
+        }
     }
 }
 
@@ -169,7 +174,10 @@ mod tests {
         Transcriber::from_parts(
             model,
             tok,
-            crate::transcriber::TranscriberConfig { max_tokens_per_window: 4, ..Default::default() },
+            crate::transcriber::TranscriberConfig {
+                max_tokens_per_window: 4,
+                ..Default::default()
+            },
         )
         .unwrap()
     }
@@ -188,7 +196,10 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
         stream.flush().unwrap();
-        assert!(!segments.is_empty(), "expected at least one flushed utterance");
+        assert!(
+            !segments.is_empty(),
+            "expected at least one flushed utterance"
+        );
         for seg in &segments {
             assert_eq!(seg.segments.len(), 1);
             assert!(seg.segments[0].end_time > seg.segments[0].start_time);

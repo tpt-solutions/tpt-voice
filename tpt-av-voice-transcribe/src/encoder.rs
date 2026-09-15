@@ -7,7 +7,7 @@
 use ndarray::Array2;
 use serde::{Deserialize, Serialize};
 
-use tpt_av_voice_utils::dsp::{mel_filterbank, hann_window, RealFft};
+use tpt_av_voice_utils::dsp::{hann_window, mel_filterbank, RealFft};
 use tpt_av_voice_utils::VoiceError;
 
 /// Mel front-end configuration.
@@ -70,7 +70,11 @@ impl MelFrontend {
         config.validate()?;
         let fft = RealFft::new(config.window_size);
         let window = hann_window(config.window_size);
-        let f_max = if config.f_max <= 0.0 { config.sample_rate as f32 / 2.0 } else { config.f_max };
+        let f_max = if config.f_max <= 0.0 {
+            config.sample_rate as f32 / 2.0
+        } else {
+            config.f_max
+        };
         let filterbank = mel_filterbank(
             config.n_mels,
             config.window_size,
@@ -78,7 +82,12 @@ impl MelFrontend {
             config.f_min,
             f_max,
         );
-        Ok(MelFrontend { config, fft, window, filterbank })
+        Ok(MelFrontend {
+            config,
+            fft,
+            window,
+            filterbank,
+        })
     }
 
     /// Borrows the configuration.
@@ -142,7 +151,10 @@ mod tests {
     #[test]
     fn config_validation() {
         assert!(MelConfig::default().validate().is_ok());
-        let bad = MelConfig { hop_size: 0, ..MelConfig::default() };
+        let bad = MelConfig {
+            hop_size: 0,
+            ..MelConfig::default()
+        };
         assert!(bad.validate().is_err());
     }
 
@@ -182,7 +194,10 @@ mod tests {
         assert!(high_top > low_top + 0.1, "{high_top} vs {low_top}");
         let low_bottom: f32 = low.slice(ndarray::s![..10, ..]).mean().unwrap();
         let high_bottom: f32 = high.slice(ndarray::s![..10, ..]).mean().unwrap();
-        assert!(low_bottom > high_bottom + 0.3, "{low_bottom} vs {high_bottom}");
+        assert!(
+            low_bottom > high_bottom + 0.3,
+            "{low_bottom} vs {high_bottom}"
+        );
     }
 
     #[test]

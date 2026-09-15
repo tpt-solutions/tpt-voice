@@ -66,16 +66,44 @@ pub fn write_demo_model(
     let mut tensors: TensorMap = BTreeMap::new();
 
     // --- encoder ---
-    put3(&mut tensors, "encoder.conv1.weight".into(), &model.encoder.conv1.weight);
-    put1(&mut tensors, "encoder.conv1.bias".into(), &model.encoder.conv1.bias);
-    put3(&mut tensors, "encoder.conv2.weight".into(), &model.encoder.conv2.weight);
-    put1(&mut tensors, "encoder.conv2.bias".into(), &model.encoder.conv2.bias);
-    put2(&mut tensors, "encoder.positional_embedding".into(), &model.encoder.positional);
+    put3(
+        &mut tensors,
+        "encoder.conv1.weight".into(),
+        &model.encoder.conv1.weight,
+    );
+    put1(
+        &mut tensors,
+        "encoder.conv1.bias".into(),
+        &model.encoder.conv1.bias,
+    );
+    put3(
+        &mut tensors,
+        "encoder.conv2.weight".into(),
+        &model.encoder.conv2.weight,
+    );
+    put1(
+        &mut tensors,
+        "encoder.conv2.bias".into(),
+        &model.encoder.conv2.bias,
+    );
+    put2(
+        &mut tensors,
+        "encoder.positional_embedding".into(),
+        &model.encoder.positional,
+    );
     for (i, b) in model.encoder.blocks.iter().enumerate() {
         let layer = |suffix: &str| format!("encoder.blocks.{i}.{suffix}");
-        put2(&mut tensors, layer("attn.query.weight"), &b.attn.query.weight);
+        put2(
+            &mut tensors,
+            layer("attn.query.weight"),
+            &b.attn.query.weight,
+        );
         put2(&mut tensors, layer("attn.key.weight"), &b.attn.key.weight);
-        put2(&mut tensors, layer("attn.value.weight"), &b.attn.value.weight);
+        put2(
+            &mut tensors,
+            layer("attn.value.weight"),
+            &b.attn.value.weight,
+        );
         put2(&mut tensors, layer("attn.out.weight"), &b.attn.out.weight);
         put2(&mut tensors, layer("mlp.0.weight"), &b.fc1.weight);
         put2(&mut tensors, layer("mlp.2.weight"), &b.fc2.weight);
@@ -90,49 +118,133 @@ pub fn write_demo_model(
         put1(&mut tensors, layer("mlp_ln.weight"), &b.mlp_ln.scale);
         put1(&mut tensors, layer("mlp_ln.bias"), &b.mlp_ln.bias);
     }
-    put1(&mut tensors, "encoder.ln_post.weight".into(), &model.encoder.ln_post.scale);
-    put1(&mut tensors, "encoder.ln_post.bias".into(), &model.encoder.ln_post.bias);
+    put1(
+        &mut tensors,
+        "encoder.ln_post.weight".into(),
+        &model.encoder.ln_post.scale,
+    );
+    put1(
+        &mut tensors,
+        "encoder.ln_post.bias".into(),
+        &model.encoder.ln_post.bias,
+    );
 
     // --- decoder ---
-    put2(&mut tensors, "decoder.token_embedding.weight".into(), &model.decoder.token_embedding);
-    put2(&mut tensors, "decoder.positional_embedding".into(), &model.decoder.positional);
+    put2(
+        &mut tensors,
+        "decoder.token_embedding.weight".into(),
+        &model.decoder.token_embedding,
+    );
+    put2(
+        &mut tensors,
+        "decoder.positional_embedding".into(),
+        &model.decoder.positional,
+    );
     for (i, b) in model.decoder.blocks.iter().enumerate() {
         let layer = |suffix: &str| format!("decoder.blocks.{i}.{suffix}");
-        put2(&mut tensors, layer("attn.query.weight"), &b.attn.query.weight);
+        put2(
+            &mut tensors,
+            layer("attn.query.weight"),
+            &b.attn.query.weight,
+        );
         put2(&mut tensors, layer("attn.key.weight"), &b.attn.key.weight);
-        put2(&mut tensors, layer("attn.value.weight"), &b.attn.value.weight);
+        put2(
+            &mut tensors,
+            layer("attn.value.weight"),
+            &b.attn.value.weight,
+        );
         put2(&mut tensors, layer("attn.out.weight"), &b.attn.out.weight);
-        put2(&mut tensors, layer("cross_attn.query.weight"), &b.cross_attn.query.weight);
-        put2(&mut tensors, layer("cross_attn.key.weight"), &b.cross_attn.key.weight);
-        put2(&mut tensors, layer("cross_attn.value.weight"), &b.cross_attn.value.weight);
-        put2(&mut tensors, layer("cross_attn.out.weight"), &b.cross_attn.out.weight);
+        put2(
+            &mut tensors,
+            layer("cross_attn.query.weight"),
+            &b.cross_attn.query.weight,
+        );
+        put2(
+            &mut tensors,
+            layer("cross_attn.key.weight"),
+            &b.cross_attn.key.weight,
+        );
+        put2(
+            &mut tensors,
+            layer("cross_attn.value.weight"),
+            &b.cross_attn.value.weight,
+        );
+        put2(
+            &mut tensors,
+            layer("cross_attn.out.weight"),
+            &b.cross_attn.out.weight,
+        );
         put2(&mut tensors, layer("mlp.0.weight"), &b.fc1.weight);
         put2(&mut tensors, layer("mlp.2.weight"), &b.fc2.weight);
         put1(&mut tensors, layer("attn.query.bias"), &b.attn.query.bias);
         put1(&mut tensors, layer("attn.key.bias"), &b.attn.key.bias);
         put1(&mut tensors, layer("attn.value.bias"), &b.attn.value.bias);
         put1(&mut tensors, layer("attn.out.bias"), &b.attn.out.bias);
-        put1(&mut tensors, layer("cross_attn.query.bias"), &b.cross_attn.query.bias);
-        put1(&mut tensors, layer("cross_attn.key.bias"), &b.cross_attn.key.bias);
-        put1(&mut tensors, layer("cross_attn.value.bias"), &b.cross_attn.value.bias);
-        put1(&mut tensors, layer("cross_attn.out.bias"), &b.cross_attn.out.bias);
+        put1(
+            &mut tensors,
+            layer("cross_attn.query.bias"),
+            &b.cross_attn.query.bias,
+        );
+        put1(
+            &mut tensors,
+            layer("cross_attn.key.bias"),
+            &b.cross_attn.key.bias,
+        );
+        put1(
+            &mut tensors,
+            layer("cross_attn.value.bias"),
+            &b.cross_attn.value.bias,
+        );
+        put1(
+            &mut tensors,
+            layer("cross_attn.out.bias"),
+            &b.cross_attn.out.bias,
+        );
         put1(&mut tensors, layer("mlp.0.bias"), &b.fc1.bias);
         put1(&mut tensors, layer("mlp.2.bias"), &b.fc2.bias);
         put1(&mut tensors, layer("attn_ln.weight"), &b.attn_ln.scale);
         put1(&mut tensors, layer("attn_ln.bias"), &b.attn_ln.bias);
-        put1(&mut tensors, layer("cross_attn_ln.weight"), &b.cross_ln.scale);
+        put1(
+            &mut tensors,
+            layer("cross_attn_ln.weight"),
+            &b.cross_ln.scale,
+        );
         put1(&mut tensors, layer("cross_attn_ln.bias"), &b.cross_ln.bias);
         put1(&mut tensors, layer("mlp_ln.weight"), &b.mlp_ln.scale);
         put1(&mut tensors, layer("mlp_ln.bias"), &b.mlp_ln.bias);
     }
-    put1(&mut tensors, "decoder.ln.weight".into(), &model.decoder.ln.scale);
-    put1(&mut tensors, "decoder.ln.bias".into(), &model.decoder.ln.bias);
-    put2(&mut tensors, "decoder.lm_head.weight".into(), &model.decoder.head.weight);
-    put1(&mut tensors, "decoder.lm_head.bias".into(), &model.decoder.head.bias);
+    put1(
+        &mut tensors,
+        "decoder.ln.weight".into(),
+        &model.decoder.ln.scale,
+    );
+    put1(
+        &mut tensors,
+        "decoder.ln.bias".into(),
+        &model.decoder.ln.bias,
+    );
+    put2(
+        &mut tensors,
+        "decoder.lm_head.weight".into(),
+        &model.decoder.head.weight,
+    );
+    put1(
+        &mut tensors,
+        "decoder.lm_head.bias".into(),
+        &model.decoder.head.bias,
+    );
 
     write_model_weights(dir, &tensors)?;
-    std::fs::write(dir.join("config.json"), serde_json::to_string_pretty(&config).unwrap())?;
+    std::fs::write(
+        dir.join("config.json"),
+        serde_json::to_string_pretty(&config).unwrap(),
+    )?;
     std::fs::write(dir.join("tokenizer.json"), tokenizer.to_json())?;
+    // Pin the export with an integrity manifest.
+    tpt_av_voice_utils::manifest::write_manifest(
+        dir,
+        &["model.safetensors", "config.json", "tokenizer.json"],
+    )?;
     Ok(config)
 }
 

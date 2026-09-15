@@ -25,7 +25,10 @@ fn transcriber_runs_end_to_end_and_is_deterministic() {
     let dir = demo_model_dir("e2e");
     let transcriber = Transcriber::from_model_dir(&dir)
         .unwrap()
-        .with_config(TranscriberConfig { max_tokens_per_window: 8, ..Default::default() });
+        .with_config(TranscriberConfig {
+            max_tokens_per_window: 8,
+            ..Default::default()
+        });
 
     // 2 s of modulated tone ("speech-like").
     let pcm: Vec<f32> = (0..32_000)
@@ -50,7 +53,10 @@ fn transcriber_reads_wav_files_and_resamples() {
     let dir = demo_model_dir("wav");
     let transcriber = Transcriber::from_model_dir(&dir)
         .unwrap()
-        .with_config(TranscriberConfig { max_tokens_per_window: 8, ..Default::default() });
+        .with_config(TranscriberConfig {
+            max_tokens_per_window: 8,
+            ..Default::default()
+        });
 
     let path = std::env::temp_dir().join(format!("tpt-voice-it-{}.wav", std::process::id()));
     let pcm: Vec<f32> = (0..8_000).map(|i| (i as f32 * 0.03).sin() * 0.5).collect();
@@ -77,7 +83,10 @@ fn streaming_finalizes_silence_bounded_utterances() {
     let dir = demo_model_dir("stream");
     let transcriber = Transcriber::from_model_dir(&dir)
         .unwrap()
-        .with_config(TranscriberConfig { max_tokens_per_window: 6, ..Default::default() });
+        .with_config(TranscriberConfig {
+            max_tokens_per_window: 6,
+            ..Default::default()
+        });
     let mut stream = tpt_av_voice_transcribe::StreamingTranscriber::new(transcriber);
 
     let mut pcm = Vec::new();
@@ -88,7 +97,24 @@ fn streaming_finalizes_silence_bounded_utterances() {
 
     let chunks = tpt_av_voice_utils::audio_chunk::chunk_pcm(pcm, 16_000, 8_000);
     let count = stream.process(chunks).filter_map(Result::ok).count();
-    assert!(count >= 1, "silence-bounded audio should finalize utterances");
+    assert!(
+        count >= 1,
+        "silence-bounded audio should finalize utterances"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn corrupt_model_file_errors_instead_of_panic() {
+    let dir = demo_model_dir("corrupt");
+    let mut tensors = tpt_av_voice_transcribe::weights::load_model_weights(&dir).unwrap();
+    // Truncate one bias tensor: loading must return an error.
+    let bias = tensors.get_mut("encoder.blocks.0.attn.query.bias").unwrap();
+    bias.data.pop();
+    let config: tpt_av_voice_transcribe::model::AsrModelConfig =
+        serde_json::from_str(&std::fs::read_to_string(dir.join("config.json")).unwrap()).unwrap();
+    let result = tpt_av_voice_transcribe::model::AsrModel::from_tensors(&tensors, config);
+    assert!(result.is_err(), "truncated bias must be rejected");
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -97,7 +123,10 @@ fn custom_decode_config_is_respected() {
     let dir = demo_model_dir("cfg");
     let transcriber = Transcriber::from_model_dir(&dir)
         .unwrap()
-        .with_config(TranscriberConfig { min_confidence: 2.0, ..Default::default() });
+        .with_config(TranscriberConfig {
+            min_confidence: 2.0,
+            ..Default::default()
+        });
     let pcm: Vec<f32> = (0..16_000).map(|i| (i as f32 * 0.02).sin()).collect();
     let t = transcriber.transcribe_samples(&pcm, 16_000).unwrap();
     // Impossible confidence threshold filters every segment out.

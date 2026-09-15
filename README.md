@@ -25,6 +25,7 @@ C/C++ bindings. Licensing is enforced by `cargo-deny` in CI.
 
 | Crate | Role |
 | :--- | :--- |
+| [`tpt-voice`](tpt-voice) | **One-crate facade**: prelude, `SpeechPipeline`, text-edit + TTS glue |
 | [`tpt-av-voice-utils`](tpt-av-voice-utils) | Shared types, DSP/NN kernels, WAV I/O, weight I/O |
 | [`tpt-av-voice-transcribe`](tpt-av-voice-transcribe) | Speech-to-text (transformer encoder-decoder, streaming) |
 | [`tpt-av-voice-isolate`](tpt-av-voice-isolate) | Real-time voice isolation (STFT masking, U-Net or classical) |
@@ -39,7 +40,8 @@ isolator, or just the diarizer.
 
 ```toml
 [dependencies]
-tpt-av-voice-isolate = "0.1"
+# Everything, one dependency:
+tpt-voice = "0.1"
 ```
 
 ```rust,no_run
@@ -53,6 +55,43 @@ let isolated = isolator.isolate_samples(&pcm.samples, pcm.sample_rate)?;
 // Isolated voice and residual noise, as f32 PCM:
 tpt_av_voice_utils::wav::write_wav_file("voice.wav", &isolated.voice, isolated.sample_rate)?;
 # Ok::<(), tpt_av_voice_utils::VoiceError>(())
+```
+
+Or compose the full intelligence pipeline in one call — transcribe,
+diarize, annotate speakers and word-align:
+
+```rust,no_run
+use tpt_voice::prelude::*;
+
+let mut pipeline = SpeechPipeline::from_model_dir(
+    "models/en-small",
+    DiarizerConfig::default(),
+    AlignerConfig::default(),
+)
+.unwrap();
+let out = pipeline.run(&pcm, 16_000).unwrap();
+# let pcm: Vec<f32> = Vec::new();
+for seg in &out.transcript.segments {
+    let speaker = seg.speaker.as_ref().map(|s| s.to_string()).unwrap_or_else(|| "?".into());
+    println!("[{:.2}] {speaker}: {}", seg.start_time, seg.text);
+}
+```
+
+Editing audio by editing text — inserted words are synthesized for you,
+ready to splice on a `tpt-audio` timeline:
+
+```rust,no_run
+use tpt_voice::prelude::*;
+
+let (edited, ops) = tpt_voice::pipeline::apply_text_edit_with_speech(
+    &aligned, "hello brave world", &VoiceProfile::default_male(), 16_000,
+)
+.unwrap();
+for op in ops {
+    println!("{:?} [{:.2}-{:.2}] audio: {} samples",
+        op.edit_type, op.start_time, op.end_time,
+        op.new_audio.as_ref().map(Vec::len).unwrap_or(0));
+}
 ```
 
 End-to-end demos live in [`examples/`](examples):
@@ -86,6 +125,20 @@ Application (displays transcript, text-based editing, captions)
 `tpt-voice` consumes decoded PCM `f32` samples from `tpt-cadence` and
 returns [`AudioEdit`](tpt-av-voice-align) operations that `tpt-audio` applies
 to timeline clips.
+
+## Benchmarks
+
+`cargo run --release -p tpt-voice-examples --example benchmark` measures
+real-time factor (RTF = processing time ÷ audio duration) against the
+spec §6 targets (transcription < 0.5×, isolation < 1.0×, diarization
+< 0.3×, CPU).
+
+## Security
+
+See [docs/SECURITY.md](docs/SECURITY.md): hostile-input threat model for
+the WAV / weight / manifest parsers, the complete `unsafe` inventory
+(SIMD kernels only, runtime-detected), SHA-256 model manifests, fuzzing
+targets, and the vulnerability reporting process.
 
 ## Design
 

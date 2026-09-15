@@ -9,10 +9,9 @@
 //! ```no_run
 //! use tpt_av_voice_tts::{FormantSynth, SynthConfig};
 //!
-//! let synth = FormantSynth::new(SynthConfig::default())?;
-//! let pcm = synth.synthesize("Hello world")?;
+//! let mut synth = FormantSynth::new(SynthConfig::default()).unwrap();
+//! let pcm = synth.synthesize("Hello world").unwrap();
 //! // pcm.samples, pcm.sample_rate ready for playback / WAV export.
-//! # Ok::<(), tpt_av_voice_utils::VoiceError>(())
 //! ```
 
 pub mod config;
@@ -23,3 +22,6 @@ pub mod voice;
 pub use config::SynthConfig;
 pub use synth::{FormantSynth, SynthesizedAudio};
 pub use voice::VoiceProfile;
+
+// Convenience re-exports for one-dependency usage.
+pub use tpt_av_voice_utils::VoiceError;

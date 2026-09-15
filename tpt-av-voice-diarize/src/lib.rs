@@ -22,7 +22,10 @@ pub mod segmentation;
 pub mod streaming;
 
 pub use clustering::{cluster, ClusteringAlgorithm, ClusteringConfig};
-pub use integration::{annotate_transcript, diarize_and_annotate};
 pub use diarizer::{DiarizationResult, Diarizer, DiarizerConfig, SpeakerSegment};
+pub use integration::{annotate_transcript, diarize_and_annotate};
 pub use segmentation::{VadConfig, VoiceActivityDetector};
 pub use streaming::StreamingDiarizer;
+
+// Convenience re-exports for one-dependency usage.
+pub use tpt_av_voice_utils::{AudioChunk, SpeakerLabel, Transcript, VoiceError};

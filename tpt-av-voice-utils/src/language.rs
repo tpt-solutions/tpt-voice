@@ -79,7 +79,9 @@ impl FromStr for Language {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let code = s.trim().to_ascii_lowercase();
         if code.is_empty() || code.len() > 8 || !code.chars().all(|c| c.is_ascii_alphanumeric()) {
-            return Err(crate::VoiceError::config(format!("invalid language code: {s:?}")));
+            return Err(crate::VoiceError::config(format!(
+                "invalid language code: {s:?}"
+            )));
         }
         Ok(Language(code))
     }

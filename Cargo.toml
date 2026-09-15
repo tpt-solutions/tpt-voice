@@ -7,6 +7,7 @@ members = [
     "tpt-av-voice-diarize",
     "tpt-av-voice-align",
     "tpt-av-voice-tts",
+    "tpt-voice",
     "examples",
 ]
 
@@ -25,10 +26,12 @@ tpt-av-voice-isolate = { path = "tpt-av-voice-isolate", version = "0.1.0" }
 tpt-av-voice-diarize = { path = "tpt-av-voice-diarize", version = "0.1.0" }
 tpt-av-voice-align = { path = "tpt-av-voice-align", version = "0.1.0" }
 tpt-av-voice-tts = { path = "tpt-av-voice-tts", version = "0.1.0" }
+tpt-voice = { path = "tpt-voice", version = "0.1.0" }
 ndarray = "0.15"
 rustfft = "6.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+sha2 = "0.10"
 log = "0.4"
 
 [profile.release]

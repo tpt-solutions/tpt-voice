@@ -92,7 +92,9 @@ impl AsrModelConfig {
             || self.n_text_state == 0
             || self.n_text_state % self.n_text_head != 0
         {
-            return Err(VoiceError::config("model width must be a non-zero multiple of heads"));
+            return Err(VoiceError::config(
+                "model width must be a non-zero multiple of heads",
+            ));
         }
         if self.n_vocab == 0 {
             return Err(VoiceError::config("n_vocab must be > 0"));
@@ -121,20 +123,38 @@ impl MultiHeadAttention {
         let get = |name: &str| -> Result<Array2<f32>, VoiceError> {
             let t = tensors
                 .get(&format!("{prefix}.{name}.weight"))
-                .ok_or_else(|| VoiceError::model(format!("missing tensor {prefix}.{name}.weight")))?;
+                .ok_or_else(|| {
+                    VoiceError::model(format!("missing tensor {prefix}.{name}.weight"))
+                })?;
             expect2(t)
         };
         let get_bias = |name: &str| -> Result<Array1<f32>, VoiceError> {
             let t = tensors
                 .get(&format!("{prefix}.{name}.bias"))
                 .ok_or_else(|| VoiceError::model(format!("missing tensor {prefix}.{name}.bias")))?;
+            if t.data.len() != _d {
+                return Err(VoiceError::model(format!(
+                    "{prefix}.{name}.bias has {} elements, expected {_d}",
+                    t.data.len()
+                )));
+            }
             Ok(Array1::from(t.data.clone()))
         };
+        let get_d = |name: &str| -> Result<Array2<f32>, VoiceError> {
+            let w = get(name)?;
+            if w.dim() != (_d, _d) {
+                return Err(VoiceError::model(format!(
+                    "{prefix}.{name}.weight has shape {:?}, expected ({_d}, {_d})",
+                    w.dim()
+                )));
+            }
+            Ok(w)
+        };
         Ok(MultiHeadAttention {
-            query: Linear::new(get("query")?, get_bias("query")?),
-            key: Linear::new(get("key")?, get_bias("key")?),
-            value: Linear::new(get("value")?, get_bias("value")?),
-            out: Linear::new(get("out")?, get_bias("out")?),
+            query: Linear::new(get_d("query")?, get_bias("query")?),
+            key: Linear::new(get_d("key")?, get_bias("key")?),
+            value: Linear::new(get_d("value")?, get_bias("value")?),
+            out: Linear::new(get_d("out")?, get_bias("out")?),
             n_heads,
         })
     }
@@ -142,7 +162,12 @@ impl MultiHeadAttention {
     /// `x` is the query source `(Tq, d)`; `kv` the key/value source
     /// `(Tk, d)` (self-attention when `None`). `mask` holds additive
     /// scores `(Tq, Tk)` (use `f32::NEG_INFINITY` for blocked cells).
-    fn forward(&self, x: &Array2<f32>, kv: Option<&Array2<f32>>, mask: Option<&Array2<f32>>) -> Array2<f32> {
+    fn forward(
+        &self,
+        x: &Array2<f32>,
+        kv: Option<&Array2<f32>>,
+        mask: Option<&Array2<f32>>,
+    ) -> Array2<f32> {
         let kv = kv.unwrap_or(x);
         let d = x.ncols();
         let head_dim = d / self.n_heads;
@@ -165,7 +190,8 @@ impl MultiHeadAttention {
             }
             let probs = softmax_rows(&scores);
             let ctx = matmul(probs.view(), v_h);
-            context.slice_mut(s![.., h * head_dim..(h + 1) * head_dim])
+            context
+                .slice_mut(s![.., h * head_dim..(h + 1) * head_dim])
                 .assign(&ctx);
         }
         self.out.forward(&context)
@@ -209,23 +235,46 @@ impl Encoder {
     ) -> Result<Self, VoiceError> {
         let conv1 = load_conv1d(tensors, "encoder.conv1")?;
         let conv2 = load_conv1d(tensors, "encoder.conv2")?;
+        let d = config.n_audio_state;
+        if conv1.weight.dim() != (d, config.n_mels, 3) {
+            return Err(VoiceError::model(format!(
+                "encoder.conv1.weight must be ({d}, {}, 3)",
+                config.n_mels
+            )));
+        }
+        if conv2.weight.dim() != (d, d, 3) {
+            return Err(VoiceError::model(format!(
+                "encoder.conv2.weight must be ({d}, {d}, 3)"
+            )));
+        }
         let pos = tensors
             .get("encoder.positional_embedding")
             .ok_or_else(|| VoiceError::model("missing encoder.positional_embedding"))?;
         let positional = expect2(pos)?;
+        if positional.dim() != (config.n_audio_ctx, d) {
+            return Err(VoiceError::model(format!(
+                "encoder.positional_embedding must be ({}, {d}), got {:?}",
+                config.n_audio_ctx,
+                positional.dim()
+            )));
+        }
         let mut blocks = Vec::with_capacity(config.n_audio_layer);
         for i in 0..config.n_audio_layer {
             let prefix = format!("encoder.blocks.{i}");
             blocks.push(EncoderBlock {
-                attn_ln: load_ln(tensors, &format!("{prefix}.attn_ln"))?,
+                attn_ln: load_ln(tensors, &format!("{prefix}.attn_ln"), config.n_audio_state)?,
                 attn: MultiHeadAttention::from_tensors(
                     tensors,
                     &format!("{prefix}.attn"),
                     config.n_audio_state,
                     config.n_audio_head,
                 )?,
-                mlp_ln: load_ln(tensors, &format!("{prefix}.mlp_ln"))?,
-                fc1: load_linear(tensors, &format!("{prefix}.mlp.0"), config.n_audio_state * 4)?,
+                mlp_ln: load_ln(tensors, &format!("{prefix}.mlp_ln"), config.n_audio_state)?,
+                fc1: load_linear(
+                    tensors,
+                    &format!("{prefix}.mlp.0"),
+                    config.n_audio_state * 4,
+                )?,
                 fc2: load_linear(tensors, &format!("{prefix}.mlp.2"), config.n_audio_state)?,
             });
         }
@@ -235,7 +284,7 @@ impl Encoder {
             conv2,
             positional,
             blocks,
-            ln_post: load_ln(tensors, "encoder.ln_post")?,
+            ln_post: load_ln(tensors, "encoder.ln_post", config.n_audio_state)?,
         })
     }
 
@@ -270,7 +319,10 @@ pub(crate) struct DecoderBlock {
 impl DecoderBlock {
     fn forward(&self, x: &Array2<f32>, audio: &Array2<f32>) -> Array2<f32> {
         let causal = causal_mask(x.nrows());
-        let h = x.to_owned() + self.attn.forward(&self.attn_ln.forward(x), None, Some(&causal));
+        let h = x.to_owned()
+            + self
+                .attn
+                .forward(&self.attn_ln.forward(x), None, Some(&causal));
         let c = self.cross_ln.forward(&h);
         let h = h + self.cross_attn.forward(&c, Some(audio), None);
         let m = self.mlp_ln.forward(&h);
@@ -295,35 +347,54 @@ impl Decoder {
         tensors: &std::collections::BTreeMap<String, tpt_av_voice_utils::safetensors::Tensor>,
         config: &AsrModelConfig,
     ) -> Result<Self, VoiceError> {
+        let td = config.n_text_state;
         let token_embedding = expect2(
             tensors
                 .get("decoder.token_embedding.weight")
                 .ok_or_else(|| VoiceError::model("missing decoder.token_embedding.weight"))?,
         )?;
+        if token_embedding.dim() != (config.n_vocab, td) {
+            return Err(VoiceError::model(format!(
+                "decoder.token_embedding.weight must be ({}, {td}), got {:?}",
+                config.n_vocab,
+                token_embedding.dim()
+            )));
+        }
         let positional = expect2(
             tensors
                 .get("decoder.positional_embedding")
                 .ok_or_else(|| VoiceError::model("missing decoder.positional_embedding"))?,
         )?;
+        if positional.dim() != (config.n_text_ctx, td) {
+            return Err(VoiceError::model(format!(
+                "decoder.positional_embedding must be ({}, {td}), got {:?}",
+                config.n_text_ctx,
+                positional.dim()
+            )));
+        }
         let mut blocks = Vec::with_capacity(config.n_text_layer);
         for i in 0..config.n_text_layer {
             let prefix = format!("decoder.blocks.{i}");
             blocks.push(DecoderBlock {
-                attn_ln: load_ln(tensors, &format!("{prefix}.attn_ln"))?,
+                attn_ln: load_ln(tensors, &format!("{prefix}.attn_ln"), config.n_text_state)?,
                 attn: MultiHeadAttention::from_tensors(
                     tensors,
                     &format!("{prefix}.attn"),
                     config.n_text_state,
                     config.n_text_head,
                 )?,
-                cross_ln: load_ln(tensors, &format!("{prefix}.cross_attn_ln"))?,
+                cross_ln: load_ln(
+                    tensors,
+                    &format!("{prefix}.cross_attn_ln"),
+                    config.n_text_state,
+                )?,
                 cross_attn: MultiHeadAttention::from_tensors(
                     tensors,
                     &format!("{prefix}.cross_attn"),
                     config.n_text_state,
                     config.n_text_head,
                 )?,
-                mlp_ln: load_ln(tensors, &format!("{prefix}.mlp_ln"))?,
+                mlp_ln: load_ln(tensors, &format!("{prefix}.mlp_ln"), config.n_text_state)?,
                 fc1: load_linear(tensors, &format!("{prefix}.mlp.0"), config.n_text_state * 4)?,
                 fc2: load_linear(tensors, &format!("{prefix}.mlp.2"), config.n_text_state)?,
             });
@@ -333,7 +404,7 @@ impl Decoder {
             token_embedding,
             positional,
             blocks,
-            ln: load_ln(tensors, "decoder.ln")?,
+            ln: load_ln(tensors, "decoder.ln", config.n_text_state)?,
             head: load_linear(tensors, "decoder.lm_head", config.n_vocab)?,
         })
     }
@@ -390,7 +461,11 @@ impl AsrModel {
         config.validate()?;
         let encoder = Encoder::from_tensors(tensors, &config)?;
         let decoder = Decoder::from_tensors(tensors, &config)?;
-        Ok(AsrModel { config, encoder, decoder })
+        Ok(AsrModel {
+            config,
+            encoder,
+            decoder,
+        })
     }
 
     /// Builds a model with deterministic (untrained) weights — used for
@@ -417,7 +492,11 @@ impl AsrModel {
             }
         }
         fn ln(d: usize) -> LayerNorm {
-            LayerNorm { scale: Array1::ones(d), bias: Array1::zeros(d), eps: 1e-5 }
+            LayerNorm {
+                scale: Array1::ones(d),
+                bias: Array1::zeros(d),
+                eps: 1e-5,
+            }
         }
         fn lin(rng: &mut Rng, rows: usize, cols: usize) -> Linear {
             Linear::new(rand2(rng, rows, cols), Array1::zeros(rows))
@@ -461,7 +540,11 @@ impl AsrModel {
             ln: ln(td),
             head: lin(&mut rng, config.n_vocab, td),
         };
-        AsrModel { config, encoder, decoder }
+        AsrModel {
+            config,
+            encoder,
+            decoder,
+        }
     }
 
     /// Audio `(n_mels, T)` → encoder embeddings `(T/2, d)`.
@@ -487,7 +570,10 @@ impl AsrModel {
         }
         n += self.decoder.token_embedding.len() + self.decoder.positional.len();
         for b in &self.decoder.blocks {
-            n += count_mha(&b.attn) + count_mha(&b.cross_attn) + b.fc1.weight.len() + b.fc2.weight.len();
+            n += count_mha(&b.attn)
+                + count_mha(&b.cross_attn)
+                + b.fc1.weight.len()
+                + b.fc2.weight.len();
         }
         n += self.decoder.head.weight.len();
         n
@@ -500,7 +586,10 @@ impl AsrModel {
 
 fn expect2(t: &tpt_av_voice_utils::safetensors::Tensor) -> Result<Array2<f32>, VoiceError> {
     if t.shape.len() != 2 {
-        return Err(VoiceError::model(format!("expected 2-D tensor, got shape {:?}", t.shape)));
+        return Err(VoiceError::model(format!(
+            "expected 2-D tensor, got shape {:?}",
+            t.shape
+        )));
     }
     Array2::from_shape_vec([t.shape[0], t.shape[1]], t.data.clone())
         .map_err(|e| VoiceError::model(format!("tensor shape mismatch: {e}")))
@@ -521,24 +610,39 @@ fn load_linear(
             weight.nrows()
         )));
     }
-    let bias = tensors
-        .get(&format!("{prefix}.bias"))
-        .map(|t| Array1::from(t.data.clone()))
-        .unwrap_or_else(|| Array1::zeros(out_features));
+    let bias = match tensors.get(&format!("{prefix}.bias")) {
+        Some(t) => {
+            if t.data.len() != out_features {
+                return Err(VoiceError::model(format!(
+                    "{prefix}.bias has {} elements, expected {out_features}",
+                    t.data.len()
+                )));
+            }
+            Array1::from(t.data.clone())
+        }
+        None => Array1::zeros(out_features),
+    };
     Ok(Linear::new(weight, bias))
 }
 
 fn load_ln(
     tensors: &std::collections::BTreeMap<String, tpt_av_voice_utils::safetensors::Tensor>,
     prefix: &str,
+    dim: usize,
 ) -> Result<LayerNorm, VoiceError> {
-    let scale = tensors
-        .get(&format!("{prefix}.weight"))
-        .ok_or_else(|| VoiceError::model(format!("missing tensor {prefix}.weight")))?;
-    let bias = tensors
-        .get(&format!("{prefix}.bias"))
-        .ok_or_else(|| VoiceError::model(format!("missing tensor {prefix}.bias")))?;
-    Ok(LayerNorm::new(Array1::from(scale.data.clone()), Array1::from(bias.data.clone())))
+    let get = |suffix: &str| -> Result<Array1<f32>, VoiceError> {
+        let t = tensors
+            .get(&format!("{prefix}.{suffix}"))
+            .ok_or_else(|| VoiceError::model(format!("missing tensor {prefix}.{suffix}")))?;
+        if t.data.len() != dim {
+            return Err(VoiceError::model(format!(
+                "{prefix}.{suffix} has {} elements, expected {dim}",
+                t.data.len()
+            )));
+        }
+        Ok(Array1::from(t.data.clone()))
+    };
+    Ok(LayerNorm::new(get("weight")?, get("bias")?))
 }
 
 fn load_conv1d(
@@ -549,10 +653,14 @@ fn load_conv1d(
         .get(&format!("{prefix}.weight"))
         .ok_or_else(|| VoiceError::model(format!("missing tensor {prefix}.weight")))?;
     if t.shape.len() != 3 {
-        return Err(VoiceError::model(format!("expected 3-D tensor, got {:?}", t.shape)));
+        return Err(VoiceError::model(format!(
+            "expected 3-D tensor, got {:?}",
+            t.shape
+        )));
     }
-    let weight = ndarray::Array3::from_shape_vec([t.shape[0], t.shape[1], t.shape[2]], t.data.clone())
-        .map_err(|e| VoiceError::model(format!("tensor shape mismatch: {e}")))?;
+    let weight =
+        ndarray::Array3::from_shape_vec([t.shape[0], t.shape[1], t.shape[2]], t.data.clone())
+            .map_err(|e| VoiceError::model(format!("tensor shape mismatch: {e}")))?;
     let bias = tensors
         .get(&format!("{prefix}.bias"))
         .map(|t| Array1::from(t.data.clone()))
@@ -579,10 +687,7 @@ mod tests {
     use super::*;
 
     fn tiny() -> AsrModel {
-        AsrModel::random_init(
-            ModelSize::Tiny.config(64),
-            0xA5,
-        )
+        AsrModel::random_init(ModelSize::Tiny.config(64), 0xA5)
     }
 
     #[test]
@@ -627,7 +732,10 @@ mod tests {
         assert_eq!(a.encoder.conv1.weight, b.encoder.conv1.weight);
         assert_ne!(
             a.encoder.conv1.weight,
-            AsrModel::random_init(ModelSize::Tiny.config(64), 7).encoder.conv1.weight
+            AsrModel::random_init(ModelSize::Tiny.config(64), 7)
+                .encoder
+                .conv1
+                .weight
         );
     }
 }

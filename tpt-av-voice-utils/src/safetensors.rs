@@ -22,9 +22,10 @@ pub struct Tensor {
 }
 
 impl Tensor {
-    /// Element count of the shape.
-    pub fn num_elements(shape: &[usize]) -> usize {
-        shape.iter().product()
+    /// Element count of the shape, or `None` on 64-bit overflow
+    /// (hostile/corrupt headers must not panic).
+    pub fn num_elements(shape: &[usize]) -> Option<usize> {
+        shape.iter().copied().try_fold(1usize, usize::checked_mul)
     }
 }
 
@@ -85,7 +86,9 @@ pub fn read_safetensors(bytes: &[u8]) -> Result<BTreeMap<String, Tensor>, VoiceE
     }
     let header_len = u64::from_le_bytes(bytes[0..8].try_into().unwrap()) as usize;
     if header_len == 0 || 8 + header_len > bytes.len() {
-        return Err(VoiceError::weights(format!("invalid header length {header_len}")));
+        return Err(VoiceError::weights(format!(
+            "invalid header length {header_len}"
+        )));
     }
     let header_json = &bytes[8..8 + header_len];
     let header: BTreeMap<String, HeaderEntry> = serde_json::from_slice(header_json)
@@ -96,36 +99,56 @@ pub fn read_safetensors(bytes: &[u8]) -> Result<BTreeMap<String, Tensor>, VoiceE
     for (name, entry) in header {
         let (start, end) = entry.data_offsets;
         if end < start || end > data.len() {
-            return Err(VoiceError::weights(format!("tensor {name:?} data range [{start},{end}) out of bounds")));
+            return Err(VoiceError::weights(format!(
+                "tensor {name:?} data range [{start},{end}) out of bounds"
+            )));
         }
         let n = end - start;
-        let expected = Tensor::num_elements(&entry.shape);
+        let expected = Tensor::num_elements(&entry.shape).ok_or_else(|| {
+            VoiceError::weights(format!("tensor {name:?} shape overflows address space"))
+        })?;
         let raw = &data[start..end];
         let decoded = match entry.dtype.as_str() {
             "F32" => {
-                if n != expected * 4 {
-                    return Err(VoiceError::weights(format!("tensor {name:?} size mismatch")));
+                if expected.checked_mul(4) != Some(n) {
+                    return Err(VoiceError::weights(format!(
+                        "tensor {name:?} size mismatch"
+                    )));
                 }
-                raw.chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect()
+                raw.chunks_exact(4)
+                    .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+                    .collect()
             }
             "F64" => {
-                if n != expected * 8 {
-                    return Err(VoiceError::weights(format!("tensor {name:?} size mismatch")));
+                if expected.checked_mul(8) != Some(n) {
+                    return Err(VoiceError::weights(format!(
+                        "tensor {name:?} size mismatch"
+                    )));
                 }
-                raw.chunks_exact(8).map(|c| f64::from_le_bytes(c.try_into().unwrap()) as f32).collect()
+                raw.chunks_exact(8)
+                    .map(|c| f64::from_le_bytes(c.try_into().unwrap()) as f32)
+                    .collect()
             }
             "F16" => {
-                if n != expected * 2 {
-                    return Err(VoiceError::weights(format!("tensor {name:?} size mismatch")));
-                }
-                raw.chunks_exact(2).map(|c| f16_to_f32(u16::from_le_bytes(c.try_into().unwrap()))).collect()
-            }
-            "BF16" => {
-                if n != expected * 2 {
-                    return Err(VoiceError::weights(format!("tensor {name:?} size mismatch")));
+                if expected.checked_mul(2) != Some(n) {
+                    return Err(VoiceError::weights(format!(
+                        "tensor {name:?} size mismatch"
+                    )));
                 }
                 raw.chunks_exact(2)
-                    .map(|c| f32::from_bits(u32::from(u16::from_le_bytes(c.try_into().unwrap())) << 16))
+                    .map(|c| f16_to_f32(u16::from_le_bytes(c.try_into().unwrap())))
+                    .collect()
+            }
+            "BF16" => {
+                if expected.checked_mul(2) != Some(n) {
+                    return Err(VoiceError::weights(format!(
+                        "tensor {name:?} size mismatch"
+                    )));
+                }
+                raw.chunks_exact(2)
+                    .map(|c| {
+                        f32::from_bits(u32::from(u16::from_le_bytes(c.try_into().unwrap())) << 16)
+                    })
                     .collect()
             }
             other => {
@@ -134,7 +157,13 @@ pub fn read_safetensors(bytes: &[u8]) -> Result<BTreeMap<String, Tensor>, VoiceE
                 )));
             }
         };
-        out.insert(name, Tensor { shape: entry.shape, data: decoded });
+        out.insert(
+            name,
+            Tensor {
+                shape: entry.shape,
+                data: decoded,
+            },
+        );
     }
     Ok(out)
 }
@@ -186,7 +215,10 @@ mod tests {
 
     fn sample() -> BTreeMap<String, (Vec<usize>, Vec<f32>)> {
         BTreeMap::from([
-            ("encoder.weight".to_string(), (vec![2, 3], vec![1.0, -2.0, 3.5, 0.25, -0.125, 7.0])),
+            (
+                "encoder.weight".to_string(),
+                (vec![2, 3], vec![1.0, -2.0, 3.5, 0.25, -0.125, 7.0]),
+            ),
             ("decoder.bias".to_string(), (vec![3], vec![0.1, 0.2, 0.3])),
         ])
     }
@@ -212,7 +244,9 @@ mod tests {
         assert_eq!((8 + header_len) % 8, 0);
         // Padding chars must be spaces inside the declared header.
         let header_end = 8 + header_len;
-        assert!(bytes[8..header_end].iter().all(|&b| b.is_ascii_graphic() || b == b' '));
+        assert!(bytes[8..header_end]
+            .iter()
+            .all(|&b| b.is_ascii_graphic() || b == b' '));
     }
 
     #[test]
@@ -235,6 +269,32 @@ mod tests {
         let smallest = f16_to_f32(0x0001);
         assert!(smallest > 0.0 && smallest < 1e-6);
         assert_eq!(f16_to_f32(0), 0.0);
+    }
+
+    #[test]
+    fn hostile_shape_rejected_without_panic() {
+        // A shape whose element count overflows usize must produce an
+        // error, not an overflow panic (debug builds) or a wraparound
+        // (release).
+        let header =
+            r#"{"a":{"dtype":"F32","shape":[18446744073709551615,2],"data_offsets":[0,8]}}"#;
+        let hl = header.len() as u64;
+        let mut bytes = hl.to_le_bytes().to_vec();
+        bytes.extend_from_slice(header.as_bytes());
+        bytes.extend_from_slice(&1.0f32.to_le_bytes());
+        bytes.extend_from_slice(&2.0f32.to_le_bytes());
+        assert!(read_safetensors(&bytes).is_err());
+    }
+
+    #[test]
+    fn size_mismatch_rejected() {
+        // shape says 2 elements but payload holds 1.
+        let header = r#"{"a":{"dtype":"F32","shape":[2],"data_offsets":[0,4]}}"#;
+        let hl = header.len() as u64;
+        let mut bytes = hl.to_le_bytes().to_vec();
+        bytes.extend_from_slice(header.as_bytes());
+        bytes.extend_from_slice(&1.0f32.to_le_bytes());
+        assert!(read_safetensors(&bytes).is_err());
     }
 
     #[test]

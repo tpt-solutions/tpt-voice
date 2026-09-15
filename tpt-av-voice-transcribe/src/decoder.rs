@@ -24,7 +24,11 @@ pub struct DecodeConfig {
 
 impl Default for DecodeConfig {
     fn default() -> Self {
-        DecodeConfig { max_tokens: 224, beam_width: 1, suppress: Vec::new() }
+        DecodeConfig {
+            max_tokens: 224,
+            beam_width: 1,
+            suppress: Vec::new(),
+        }
     }
 }
 
@@ -102,7 +106,10 @@ impl Decoder for BeamSearchDecoder {
     ) -> Result<Vec<usize>, VoiceError> {
         config.validate()?;
         let width = config.beam_width.max(1);
-        let mut beams = vec![Beam { tokens: prompt.to_vec(), logprob: 0.0 }];
+        let mut beams = vec![Beam {
+            tokens: prompt.to_vec(),
+            logprob: 0.0,
+        }];
         let mut finished: Vec<Beam> = Vec::new();
 
         for _ in 0..config.max_tokens {
@@ -126,7 +133,11 @@ impl Decoder for BeamSearchDecoder {
                     candidates.push(b);
                 }
             }
-            candidates.sort_by(|a, b| b.logprob.partial_cmp(&a.logprob).unwrap_or(std::cmp::Ordering::Equal));
+            candidates.sort_by(|a, b| {
+                b.logprob
+                    .partial_cmp(&a.logprob)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
             beams = candidates.into_iter().take(width).collect();
             // Beams that hit the context limit are retired.
             let (mut done, live): (Vec<_>, Vec<_>) = beams
@@ -140,7 +151,9 @@ impl Decoder for BeamSearchDecoder {
             .into_iter()
             .max_by(|a, b| {
                 let norm = |b: &Beam| b.logprob / b.tokens.len() as f32;
-                norm(a).partial_cmp(&norm(b)).unwrap_or(std::cmp::Ordering::Equal)
+                norm(a)
+                    .partial_cmp(&norm(b))
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|b| b.tokens)
             .unwrap_or_else(|| prompt.to_vec());
@@ -256,7 +269,11 @@ fn log_softmax(row: &[f32], suppress: &[usize]) -> Vec<f32> {
 
 fn top_k(log_probs: &[f32], k: usize) -> Vec<usize> {
     let mut idx: Vec<usize> = (0..log_probs.len()).collect();
-    idx.sort_by(|a, b| log_probs[*b].partial_cmp(&log_probs[*a]).unwrap_or(std::cmp::Ordering::Equal));
+    idx.sort_by(|a, b| {
+        log_probs[*b]
+            .partial_cmp(&log_probs[*a])
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     idx.truncate(k);
     idx
 }
@@ -277,7 +294,10 @@ mod tests {
     fn greedy_produces_prompt_plus_tokens() {
         let m = model();
         let audio = m.encode(&Array2::<f32>::zeros((80, 40)));
-        let cfg = DecodeConfig { max_tokens: 5, ..Default::default() };
+        let cfg = DecodeConfig {
+            max_tokens: 5,
+            ..Default::default()
+        };
         let out = GreedyDecoder.decode(&m, &audio, &[0], &cfg).unwrap();
         assert_eq!(out.len(), 6);
         assert_eq!(&out[..1], &[0]);
@@ -290,8 +310,15 @@ mod tests {
     fn beam_beats_or_equals_greedy_probability() {
         let m = model();
         let audio = m.encode(&Array2::<f32>::zeros((80, 40)));
-        let cfg_g = DecodeConfig { max_tokens: 4, ..Default::default() };
-        let cfg_b = DecodeConfig { max_tokens: 4, beam_width: 3, ..Default::default() };
+        let cfg_g = DecodeConfig {
+            max_tokens: 4,
+            ..Default::default()
+        };
+        let cfg_b = DecodeConfig {
+            max_tokens: 4,
+            beam_width: 3,
+            ..Default::default()
+        };
         let g = GreedyDecoder.decode(&m, &audio, &[0], &cfg_g).unwrap();
         let b = BeamSearchDecoder.decode(&m, &audio, &[0], &cfg_b).unwrap();
         assert_eq!(g.len(), b.len());
@@ -299,8 +326,13 @@ mod tests {
 
     #[test]
     fn decode_config_validation() {
-        let cfg = DecodeConfig { max_tokens: 0, ..Default::default() };
-        assert!(GreedyDecoder.decode(&model(), &Array2::<f32>::zeros((80, 8)), &[], &cfg).is_err());
+        let cfg = DecodeConfig {
+            max_tokens: 0,
+            ..Default::default()
+        };
+        assert!(GreedyDecoder
+            .decode(&model(), &Array2::<f32>::zeros((80, 8)), &[], &cfg)
+            .is_err());
     }
 
     #[test]
@@ -337,8 +369,13 @@ mod tests {
         let tok = BpeTokenizer::train("hello world hello world", 300).unwrap();
         let m = AsrModel::random_init(ModelSize::Tiny.config(tok.vocab_size()), 1);
         let audio = m.encode(&Array2::<f32>::zeros((80, 40)));
-        let cfg = DecodeConfig { max_tokens: 8, ..Default::default() };
-        let out = GreedyDecoder.decode(&m, &audio, &[tok.sot_token()], &cfg).unwrap();
+        let cfg = DecodeConfig {
+            max_tokens: 8,
+            ..Default::default()
+        };
+        let out = GreedyDecoder
+            .decode(&m, &audio, &[tok.sot_token()], &cfg)
+            .unwrap();
         let _ = tok.decode(&out); // must not panic; content is gibberish by design
     }
 }

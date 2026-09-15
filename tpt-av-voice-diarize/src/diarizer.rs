@@ -9,7 +9,7 @@ use tpt_av_voice_utils::{safetensors, SpeakerLabel, TimeRange, VoiceError};
 
 use crate::clustering::{cluster, ClusteringAlgorithm, ClusteringConfig};
 use crate::embedding::{ClassicalEmbedding, EmbeddingModel, SpeakerEmbedder};
-use crate::segmentation::{SpeechRegions, VoiceActivityDetector, VadConfig};
+use crate::segmentation::{SpeechRegions, VadConfig, VoiceActivityDetector};
 
 /// Diarization settings (spec §4.4).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -108,7 +108,10 @@ impl Diarizer {
     }
 
     /// Wraps a custom embedder.
-    pub fn from_embedder(embedder: Box<dyn SpeakerEmbedder>, config: DiarizerConfig) -> Result<Self, VoiceError> {
+    pub fn from_embedder(
+        embedder: Box<dyn SpeakerEmbedder>,
+        config: DiarizerConfig,
+    ) -> Result<Self, VoiceError> {
         if config.max_segment_secs <= 0.0 {
             return Err(VoiceError::config("max_segment_secs must be > 0"));
         }
@@ -292,7 +295,10 @@ mod tests {
 
     #[test]
     fn exact_speaker_count_is_honored() {
-        let cfg = DiarizerConfig { num_speakers: Some(3), ..Default::default() };
+        let cfg = DiarizerConfig {
+            num_speakers: Some(3),
+            ..Default::default()
+        };
         let mut d = Diarizer::classical(cfg).unwrap();
         let result = d.diarize_samples(&meeting(), 16_000).unwrap();
         assert_eq!(result.num_speakers, 3);
@@ -308,7 +314,10 @@ mod tests {
 
     #[test]
     fn config_validation() {
-        let bad = DiarizerConfig { max_segment_secs: 0.0, ..Default::default() };
+        let bad = DiarizerConfig {
+            max_segment_secs: 0.0,
+            ..Default::default()
+        };
         assert!(Diarizer::classical(bad).is_err());
     }
 }

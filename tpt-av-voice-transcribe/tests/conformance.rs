@@ -15,7 +15,9 @@ use tpt_av_voice_transcribe::Transcriber;
 use tpt_av_voice_utils::wav;
 
 fn collect_pairs(root: &Path, out: &mut Vec<(std::path::PathBuf, std::path::PathBuf)>) {
-    let Ok(entries) = std::fs::read_dir(root) else { return };
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return;
+    };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
@@ -36,8 +38,10 @@ fn librispeech_conformance_when_dataset_present() {
         std::env::var("TPT_VOICE_CONFORMANCE_MODEL").ok(),
         std::env::var("TPT_VOICE_CONFORMANCE_DATA").ok(),
     ) else {
-        eprintln!("skipping conformance: set TPT_VOICE_CONFORMANCE_MODEL and \
-                   TPT_VOICE_CONFORMANCE_DATA to run LibriSpeech evaluation");
+        eprintln!(
+            "skipping conformance: set TPT_VOICE_CONFORMANCE_MODEL and \
+                   TPT_VOICE_CONFORMANCE_DATA to run LibriSpeech evaluation"
+        );
         return;
     };
 
@@ -52,7 +56,9 @@ fn librispeech_conformance_when_dataset_present() {
         let reference = std::fs::read_to_string(txt_path).unwrap().to_lowercase();
         let reference_words: Vec<&str> = reference.split_whitespace().collect();
         let audio = wav::read_wav_file(wav_path).unwrap();
-        let transcript = transcriber.transcribe_samples(&audio.to_mono(), audio.sample_rate).unwrap();
+        let transcript = transcriber
+            .transcribe_samples(&audio.to_mono(), audio.sample_rate)
+            .unwrap();
         let hyp_words: Vec<&str> = transcript.full_text.split_whitespace().collect();
         total_errors += levenshtein_words(&hyp_words, &reference_words);
         total_words += reference_words.len();
@@ -71,7 +77,9 @@ fn levenshtein_words(hyp: &[&str], reference: &[&str]) -> usize {
         dp[0] = i + 1;
         for (j, h) in hyp.iter().enumerate() {
             let tmp = dp[j + 1];
-            dp[j + 1] = (dp[j + 1] + 1).min(dp[j] + 1).min(prev + usize::from(h != r));
+            dp[j + 1] = (dp[j + 1] + 1)
+                .min(dp[j] + 1)
+                .min(prev + usize::from(h != r));
             prev = tmp;
         }
     }

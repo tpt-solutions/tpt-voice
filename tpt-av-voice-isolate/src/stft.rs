@@ -18,7 +18,10 @@ pub struct StftConfig {
 
 impl Default for StftConfig {
     fn default() -> Self {
-        StftConfig { n_fft: 512, hop_size: 256 }
+        StftConfig {
+            n_fft: 512,
+            hop_size: 256,
+        }
     }
 }
 
@@ -49,7 +52,11 @@ pub struct Stft {
 impl Stft {
     pub fn new(config: StftConfig) -> Result<Self, VoiceError> {
         config.validate()?;
-        Ok(Stft { fft: RealFft::new(config.n_fft), window: hann_window(config.n_fft), config })
+        Ok(Stft {
+            fft: RealFft::new(config.n_fft),
+            window: hann_window(config.n_fft),
+            config,
+        })
     }
 
     pub fn config(&self) -> &StftConfig {
@@ -65,8 +72,7 @@ impl Stft {
         for t in 0..n_frames {
             let start = t * self.config.hop_size;
             let frame = &samples[start..(start + self.config.n_fft).min(samples.len())];
-            let windowed: Vec<f32> =
-                frame.iter().zip(&self.window).map(|(s, w)| s * w).collect();
+            let windowed: Vec<f32> = frame.iter().zip(&self.window).map(|(s, w)| s * w).collect();
             let spectrum = self.fft.forward(&windowed);
             for (b, c) in spectrum.iter().enumerate().take(bins) {
                 out[[t, b]] = *c;
@@ -88,9 +94,24 @@ mod tests {
     #[test]
     fn config_validation() {
         assert!(StftConfig::default().validate().is_ok());
-        assert!(StftConfig { n_fft: 500, hop_size: 128 }.validate().is_err());
-        assert!(StftConfig { n_fft: 512, hop_size: 0 }.validate().is_err());
-        assert!(StftConfig { n_fft: 512, hop_size: 600 }.validate().is_err());
+        assert!(StftConfig {
+            n_fft: 500,
+            hop_size: 128
+        }
+        .validate()
+        .is_err());
+        assert!(StftConfig {
+            n_fft: 512,
+            hop_size: 0
+        }
+        .validate()
+        .is_err());
+        assert!(StftConfig {
+            n_fft: 512,
+            hop_size: 600
+        }
+        .validate()
+        .is_err());
     }
 
     #[test]

@@ -84,7 +84,9 @@ impl<'a> StreamingIsolator<'a> {
     /// final (initially fewer than the input, by the latency amount).
     pub fn push(&mut self, chunk: &AudioChunk) -> Result<AudioChunk, VoiceError> {
         if chunk.sample_rate != 16_000 {
-            return Err(VoiceError::config("streaming isolator expects 16 kHz chunks"));
+            return Err(VoiceError::config(
+                "streaming isolator expects 16 kHz chunks",
+            ));
         }
         if self.start_time.is_none() {
             self.start_time = Some(chunk.start_time);
@@ -110,8 +112,7 @@ impl<'a> StreamingIsolator<'a> {
     fn process_ready_frames(&mut self) -> Result<(), VoiceError> {
         while self.input.len() >= self.n_fft {
             let frame: Vec<f32> = self.input[..self.n_fft].to_vec();
-            let windowed: Vec<f32> =
-                frame.iter().zip(&self.window).map(|(s, w)| s * w).collect();
+            let windowed: Vec<f32> = frame.iter().zip(&self.window).map(|(s, w)| s * w).collect();
             let spectrum = self.fft.forward(&windowed);
             let half = &spectrum[..self.n_fft / 2 + 1];
             let mag: Vec<f32> = half.iter().map(|c| c.norm()).collect();
@@ -143,11 +144,15 @@ impl<'a> StreamingIsolator<'a> {
     /// future frame can touch them, i.e. index < frames·hop (or
     /// everything, on the final pass).
     fn take_output(&mut self, max: usize, final_pass: bool) -> AudioChunk {
-        let horizon = if final_pass { usize::MAX } else { self.frames * self.hop };
+        let horizon = if final_pass {
+            usize::MAX
+        } else {
+            self.frames * self.hop
+        };
         let ready = horizon.saturating_sub(self.next_out).min(self.acc.len());
         let n = ready.min(max);
         // Never emit more than the real input we were given (flush pads).
-        let n = n.min(self.total_in.saturating_sub(self.next_out - 0).max(0));
+        let n = n.min(self.total_in.saturating_sub(self.next_out));
         let out: Vec<f32> = self.acc[..n]
             .iter()
             .zip(&self.wsum[..n])
@@ -183,7 +188,12 @@ mod tests {
         let input: Vec<f32> = (0..16_000).map(|i| (i as f32 * 0.01).sin() * 0.3).collect();
         let mut out = Vec::new();
         for (s, c) in input.chunks(1_600).enumerate() {
-            out.extend(stream.push(&chunk(c.to_vec(), 0.0, s as u64)).unwrap().samples);
+            out.extend(
+                stream
+                    .push(&chunk(c.to_vec(), 0.0, s as u64))
+                    .unwrap()
+                    .samples,
+            );
         }
         out.extend(stream.flush().unwrap().samples);
         assert_eq!(out.len(), input.len(), "streaming must preserve length");
@@ -202,17 +212,23 @@ mod tests {
         let mut stream = StreamingIsolator::new(&mut stream_iso);
         let mut streamed = Vec::new();
         for (s, c) in input.chunks(2_000).enumerate() {
-            streamed.extend(stream.push(&chunk(c.to_vec(), 0.0, s as u64)).unwrap().samples);
+            streamed.extend(
+                stream
+                    .push(&chunk(c.to_vec(), 0.0, s as u64))
+                    .unwrap()
+                    .samples,
+            );
         }
         streamed.extend(stream.flush().unwrap().samples);
 
         // Same pipeline, different framing → tiny numerical drift only.
         // Compare interior regions (both paths taper their very edges).
         let (start, end) = (1_000, 15_000);
-        let mut max_diff = 0.0f32;
-        for i in start..end {
-            max_diff = max_diff.max((batch.voice[i] - streamed[i]).abs());
-        }
+        let max_diff = batch.voice[start..end]
+            .iter()
+            .zip(&streamed[start..end])
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0f32, f32::max);
         assert!(max_diff < 1e-3, "max diff {max_diff}");
     }
 

@@ -119,7 +119,11 @@ mod tests {
         let mask = sub.frame_mask(&[0.2, 2.0, 0.2, 0.2]);
         assert!(mask[1] > 0.9, "loud bin should pass, got {}", mask[1]);
         // Quiet bins sit at/near the floor.
-        assert!(mask[0] < 0.6, "noise bin should be attenuated, got {}", mask[0]);
+        assert!(
+            mask[0] < 0.6,
+            "noise bin should be attenuated, got {}",
+            mask[0]
+        );
         // And the steady-state noise floor converges low.
         let mask = sub.frame_mask(&[0.2; 4]);
         assert!(mask.iter().all(|m| *m < 0.6));

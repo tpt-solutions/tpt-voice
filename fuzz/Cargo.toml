@@ -1,0 +1,40 @@
+[package]
+name = "tpt-voice-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+# Deliberately its own workspace: cargo-fuzz targets build with the
+# libFuzzer runtime and a nightly toolchain, and must not pollute the
+# library workspace's lockfile.
+[workspace]
+members = []
+
+[dependencies]
+libfuzzer-sys = "0.4"
+tpt-av-voice-utils = { path = "../tpt-av-voice-utils" }
+tpt-av-voice-transcribe = { path = "../tpt-av-voice-transcribe" }
+
+[[bin]]
+name = "wav_parse"
+path = "fuzz_targets/wav_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "safetensors_parse"
+path = "fuzz_targets/safetensors_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "tokenizer_json"
+path = "fuzz_targets/tokenizer_json.rs"
+test = false
+doc = false
+bench = false

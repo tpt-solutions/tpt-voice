@@ -1,0 +1,19 @@
+[package]
+name = "tpt-voice"
+description = "Pure-Rust speech processing engine: one-crate facade over transcription, isolation, diarization, alignment, editing and TTS"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+keywords = ["audio", "speech", "asr", "diarization", "machine-learning"]
+categories = ["multimedia::audio", "science"]
+
+[dependencies]
+tpt-av-voice-utils = { workspace = true }
+tpt-av-voice-transcribe = { workspace = true }
+tpt-av-voice-isolate = { workspace = true }
+tpt-av-voice-diarize = { workspace = true }
+tpt-av-voice-align = { workspace = true }
+tpt-av-voice-tts = { workspace = true }

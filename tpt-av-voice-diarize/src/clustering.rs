@@ -2,6 +2,10 @@
 //! cosine distance) and spectral clustering with eigengap-based speaker
 //! count selection, plus optional min/max/expected speaker constraints.
 
+// Matrix kernels (affinity, Laplacian assembly, Jacobi rotations) read
+// clearest with index loops over rows and columns.
+#![allow(clippy::needless_range_loop)]
+
 use serde::{Deserialize, Serialize};
 
 use tpt_av_voice_utils::VoiceError;
@@ -48,7 +52,9 @@ impl Default for ClusteringConfig {
 impl ClusteringConfig {
     pub fn validate(&self) -> Result<(), VoiceError> {
         if !(0.0..=2.0).contains(&self.threshold) {
-            return Err(VoiceError::config("threshold must be within [0, 2] (cosine distance)"));
+            return Err(VoiceError::config(
+                "threshold must be within [0, 2] (cosine distance)",
+            ));
         }
         if let (Some(min), Some(max)) = (self.min_speakers, self.max_speakers) {
             if min > max {
@@ -106,7 +112,11 @@ fn agglomerative(embeddings: &[Vec<f32>], config: &ClusteringConfig) -> Vec<usiz
                 count += 1;
             }
         }
-        if count == 0 { f32::INFINITY } else { sum / count as f32 }
+        if count == 0 {
+            f32::INFINITY
+        } else {
+            sum / count as f32
+        }
     };
 
     let closest_pair = |clusters: &Vec<Vec<usize>>| -> (usize, usize, f32) {
@@ -161,6 +171,8 @@ fn agglomerative(embeddings: &[Vec<f32>], config: &ClusteringConfig) -> Vec<usiz
 /// (symmetric), Jacobi eigendecomposition, k-means on the top
 /// eigenvectors. k comes from `num_speakers` or the eigengap heuristic,
 /// clamped by min/max.
+// Laplacian assembly and affinity scans read clearest with index loops.
+#[allow(clippy::needless_range_loop)]
 fn spectral(embeddings: &[Vec<f32>], config: &ClusteringConfig) -> Vec<usize> {
     let n = embeddings.len();
     if n == 1 {
@@ -277,7 +289,9 @@ fn jacobi_eigen(matrix: &[Vec<f32>], k: usize) -> (Vec<f32>, Vec<Vec<f32>>) {
         }
     }
     // Collect eigenpairs, sort by eigenvalue ascending.
-    let mut pairs: Vec<(f32, Vec<f32>)> = (0..n).map(|i| (a[i][i], (0..n).map(|r| v[r][i]).collect())).collect();
+    let mut pairs: Vec<(f32, Vec<f32>)> = (0..n)
+        .map(|i| (a[i][i], (0..n).map(|r| v[r][i]).collect()))
+        .collect();
     pairs.sort_by(|x, y| x.0.partial_cmp(&y.0).unwrap_or(std::cmp::Ordering::Equal));
     let take = k.min(pairs.len());
     let values = pairs[..take].iter().map(|(val, _)| *val).collect();
@@ -368,7 +382,10 @@ mod tests {
     #[test]
     fn config_validation() {
         assert!(ClusteringConfig::default().validate().is_ok());
-        let bad = ClusteringConfig { threshold: 3.0, ..Default::default() };
+        let bad = ClusteringConfig {
+            threshold: 3.0,
+            ..Default::default()
+        };
         assert!(bad.validate().is_err());
         let bad = ClusteringConfig {
             min_speakers: Some(4),
@@ -386,7 +403,14 @@ mod tests {
             point(&[0.0, 1.0, 0.1]),
             point(&[0.1, 0.9, 0.0]),
         ];
-        let labels = cluster(&data, &ClusteringConfig { threshold: 0.3, ..Default::default() }).unwrap();
+        let labels = cluster(
+            &data,
+            &ClusteringConfig {
+                threshold: 0.3,
+                ..Default::default()
+            },
+        )
+        .unwrap();
         assert_eq!(labels[0], labels[1]);
         assert_eq!(labels[2], labels[3]);
         assert_ne!(labels[0], labels[2]);
@@ -399,10 +423,19 @@ mod tests {
             .collect();
         let labels = cluster(
             &data,
-            &ClusteringConfig { num_speakers: Some(3), ..Default::default() },
+            &ClusteringConfig {
+                num_speakers: Some(3),
+                ..Default::default()
+            },
         )
         .unwrap();
-        assert_eq!(labels.iter().collect::<std::collections::HashSet<_>>().len(), 3);
+        assert_eq!(
+            labels
+                .iter()
+                .collect::<std::collections::HashSet<_>>()
+                .len(),
+            3
+        );
     }
 
     #[test]
@@ -415,7 +448,10 @@ mod tests {
         ];
         let labels = cluster(
             &data,
-            &ClusteringConfig { algorithm: ClusteringAlgorithm::Spectral, ..Default::default() },
+            &ClusteringConfig {
+                algorithm: ClusteringAlgorithm::Spectral,
+                ..Default::default()
+            },
         )
         .unwrap();
         assert_eq!(labels[0], labels[1]);
@@ -425,7 +461,9 @@ mod tests {
 
     #[test]
     fn empty_and_single() {
-        assert!(cluster(&[], &ClusteringConfig::default()).unwrap().is_empty());
+        assert!(cluster(&[], &ClusteringConfig::default())
+            .unwrap()
+            .is_empty());
         let one = cluster(&[point(&[1.0, 0.0])], &ClusteringConfig::default()).unwrap();
         assert_eq!(one, vec![0]);
     }
@@ -433,7 +471,11 @@ mod tests {
     #[test]
     fn jacobi_finds_known_eigenpairs() {
         // diag(1, 3, 2) has eigenvalues 1, 2, 3.
-        let m = vec![vec![1.0, 0.0, 0.0], vec![0.0, 3.0, 0.0], vec![0.0, 0.0, 2.0]];
+        let m = vec![
+            vec![1.0, 0.0, 0.0],
+            vec![0.0, 3.0, 0.0],
+            vec![0.0, 0.0, 2.0],
+        ];
         let (values, _) = jacobi_eigen(&m, 3);
         assert!((values[0] - 1.0).abs() < 1e-4);
         assert!((values[1] - 2.0).abs() < 1e-4);

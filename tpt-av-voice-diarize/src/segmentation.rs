@@ -67,7 +67,10 @@ impl VoiceActivityDetector {
         // Frame energies in dBFS, weighted toward perceptual loudness
         // (band-limited: DC and ultra-high bins contribute little).
         let mut frame_db: Vec<f32> = Vec::new();
-        for frame in samples.windows(self.config.frame_len).step_by(self.config.hop) {
+        for frame in samples
+            .windows(self.config.frame_len)
+            .step_by(self.config.hop)
+        {
             let windowed: Vec<f32> = frame.iter().zip(&window).map(|(s, w)| s * w).collect();
             let spectrum = fft.forward(&windowed);
             let bins = spectrum.len() / 2;
@@ -200,9 +203,11 @@ mod tests {
 
     #[test]
     fn gaps_are_bridged() {
-        let mut cfg = VadConfig::default();
-        cfg.min_silence_secs = 0.5;
-        let d = VoiceActivityDetector::new(cfg).unwrap();
+        let d = VoiceActivityDetector::new(VadConfig {
+            min_silence_secs: 0.5,
+            ..VadConfig::default()
+        })
+        .unwrap();
         let mut pcm = Vec::new();
         pcm.extend(buzz(180.0, 1.0, 0.4));
         pcm.extend(vec![0.0; 4_000]); // 250 ms gap — bridged
@@ -213,6 +218,10 @@ mod tests {
 
     #[test]
     fn invalid_config_rejected() {
-        assert!(VoiceActivityDetector::new(VadConfig { hop: 0, ..Default::default() }).is_err());
+        assert!(VoiceActivityDetector::new(VadConfig {
+            hop: 0,
+            ..Default::default()
+        })
+        .is_err());
     }
 }

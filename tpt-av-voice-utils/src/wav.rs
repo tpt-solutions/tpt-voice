@@ -28,7 +28,11 @@ pub struct WavData {
 impl WavData {
     /// Number of frames (sample sets) in the data.
     pub fn frames(&self) -> usize {
-        if self.channels == 0 { 0 } else { self.samples.len() / self.channels as usize }
+        if self.channels == 0 {
+            0
+        } else {
+            self.samples.len() / self.channels as usize
+        }
     }
 
     /// Duration in seconds.
@@ -70,7 +74,11 @@ pub fn read_wav_file(path: impl AsRef<Path>) -> Result<WavData, VoiceError> {
 /// every other chunk is skipped.
 pub fn read_wav_bytes(bytes: &[u8]) -> Result<WavData, VoiceError> {
     let ensure = |cond: bool, msg: &str| -> Result<(), VoiceError> {
-        if cond { Ok(()) } else { Err(AudioError::InvalidFormat(msg.to_string()).into()) }
+        if cond {
+            Ok(())
+        } else {
+            Err(AudioError::InvalidFormat(msg.to_string()).into())
+        }
     };
     ensure(bytes.len() >= 12, "file too short for RIFF header")?;
     ensure(&bytes[0..4] == b"RIFF", "missing RIFF magic")?;
@@ -82,20 +90,31 @@ pub fn read_wav_bytes(bytes: &[u8]) -> Result<WavData, VoiceError> {
 
     while pos + 8 <= bytes.len() {
         let id = &bytes[pos..pos + 4];
-        let size = u32::from_le_bytes([bytes[pos + 4], bytes[pos + 5], bytes[pos + 6], bytes[pos + 7]])
-            as usize;
+        let size = u32::from_le_bytes([
+            bytes[pos + 4],
+            bytes[pos + 5],
+            bytes[pos + 6],
+            bytes[pos + 7],
+        ]) as usize;
         let payload = pos + 8;
         let end = payload.saturating_add(size);
         if end > bytes.len() {
-            return Err(AudioError::Truncated(format!("chunk {id:?} claims {size} bytes past EOF")).into());
+            return Err(AudioError::Truncated(format!(
+                "chunk {id:?} claims {size} bytes past EOF"
+            ))
+            .into());
         }
         match id {
             b"fmt " => {
                 ensure(size >= 16, "fmt chunk too small")?;
                 let audio_format = u16::from_le_bytes([bytes[payload], bytes[payload + 1]]);
                 let channels = u16::from_le_bytes([bytes[payload + 2], bytes[payload + 3]]);
-                let sample_rate =
-                    u32::from_le_bytes([bytes[payload + 4], bytes[payload + 5], bytes[payload + 6], bytes[payload + 7]]);
+                let sample_rate = u32::from_le_bytes([
+                    bytes[payload + 4],
+                    bytes[payload + 5],
+                    bytes[payload + 6],
+                    bytes[payload + 7],
+                ]);
                 let bits = u16::from_le_bytes([bytes[payload + 14], bytes[payload + 15]]);
                 let mut fmt = audio_format;
                 if audio_format == FMT_EXTENSIBLE {
@@ -118,8 +137,8 @@ pub fn read_wav_bytes(bytes: &[u8]) -> Result<WavData, VoiceError> {
 
     let (fmt, channels, sample_rate, bits) =
         format.ok_or_else(|| AudioError::InvalidFormat("missing fmt chunk".into()))?;
-    let (start, end) = data_range
-        .ok_or_else(|| AudioError::InvalidFormat("missing data chunk".into()))?;
+    let (start, end) =
+        data_range.ok_or_else(|| AudioError::InvalidFormat("missing data chunk".into()))?;
 
     let bytes_per_sample = (bits / 8) as usize;
     ensure(bytes_per_sample > 0, "zero bits per sample")?;
@@ -146,7 +165,8 @@ pub fn read_wav_bytes(bytes: &[u8]) -> Result<WavData, VoiceError> {
         }
         (FMT_PCM, 32) => {
             for chunk in raw.chunks_exact(4) {
-                samples.push(i32::from_le_bytes(chunk.try_into().unwrap()) as f32 / 2_147_483_648.0);
+                samples
+                    .push(i32::from_le_bytes(chunk.try_into().unwrap()) as f32 / 2_147_483_648.0);
             }
         }
         (FMT_FLOAT, 32) => {
@@ -160,11 +180,17 @@ pub fn read_wav_bytes(bytes: &[u8]) -> Result<WavData, VoiceError> {
             }
         }
         (fmt, bits) => {
-            return Err(AudioError::UnsupportedEncoding(format!("format {fmt}, {bits} bits")).into());
+            return Err(
+                AudioError::UnsupportedEncoding(format!("format {fmt}, {bits} bits")).into(),
+            );
         }
     }
 
-    Ok(WavData { samples, sample_rate, channels })
+    Ok(WavData {
+        samples,
+        sample_rate,
+        channels,
+    })
 }
 
 /// Writes `samples` (interleaved) as 16-bit PCM WAV to a stream.
@@ -177,7 +203,17 @@ pub fn write_wav(
     if channels == 0 {
         return Err(AudioError::InvalidFormat("zero channels".into()).into());
     }
-    let data_len = (samples.len() * 2) as u32;
+    // RIFF sizes are 32-bit; refuse inputs that would wrap instead of
+    // silently writing a corrupt header.
+    let data_len_u64 = samples.len() as u64 * 2;
+    if data_len_u64 + 36 > u32::MAX as u64 {
+        return Err(AudioError::InvalidFormat(format!(
+            "WAV output of {} samples exceeds the 32-bit RIFF limit",
+            samples.len()
+        ))
+        .into());
+    }
+    let data_len = data_len_u64 as u32;
     let bits = 16u16;
     let block_align = channels * bits / 8;
     writer.write_all(b"RIFF")?;
@@ -281,7 +317,7 @@ mod tests {
         full.extend_from_slice(&(list_payload.len() as u32).to_le_bytes());
         full.extend_from_slice(&list_payload);
         full.push(0); // pad byte
-        // copy original fmt+data from buf
+                      // copy original fmt+data from buf
         full.extend_from_slice(&buf[12..]);
 
         let wav = read_wav_bytes(&full).unwrap();
@@ -295,12 +331,19 @@ mod tests {
         let mut buf = Vec::new();
         write_wav(&mut buf, &[0.5], 8000, 1).unwrap();
         buf.truncate(30);
-        assert!(matches!(read_wav_bytes(&buf), Err(VoiceError::Audio(AudioError::Truncated(_)))));
+        assert!(matches!(
+            read_wav_bytes(&buf),
+            Err(VoiceError::Audio(AudioError::Truncated(_)))
+        ));
     }
 
     #[test]
     fn stereo_to_mono() {
-        let wav = WavData { samples: vec![0.0, 1.0, 0.5, 0.5], sample_rate: 8000, channels: 2 };
+        let wav = WavData {
+            samples: vec![0.0, 1.0, 0.5, 0.5],
+            sample_rate: 8000,
+            channels: 2,
+        };
         assert_eq!(wav.to_mono(), vec![0.5, 0.5]);
         assert!((wav.duration() - 0.00025).abs() < 1e-9);
     }

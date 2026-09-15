@@ -78,8 +78,14 @@ mod tests {
         t.push_segment(TranscriptSegment::new(5.0, 6.0, "?", 1.0)); // no overlap
         let n = annotate_transcript(&mut t, &result()).unwrap();
         assert_eq!(n, 2);
-        assert_eq!(t.segments[0].speaker.as_ref().unwrap().display_name(), "Alice");
-        assert_eq!(t.segments[1].speaker.as_ref().unwrap().display_name(), "Bob");
+        assert_eq!(
+            t.segments[0].speaker.as_ref().unwrap().display_name(),
+            "Alice"
+        );
+        assert_eq!(
+            t.segments[1].speaker.as_ref().unwrap().display_name(),
+            "Bob"
+        );
         assert!(t.segments[2].speaker.is_none());
     }
 

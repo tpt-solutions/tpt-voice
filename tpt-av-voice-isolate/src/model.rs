@@ -9,7 +9,7 @@
 //! trained weights (loaded via [`SeparationModel::from_tensors`]) make
 //! it selective.
 
-use ndarray::{Array2, Array3, Array4, s};
+use ndarray::{s, Array2, Array3, Array4};
 use serde::{Deserialize, Serialize};
 
 use tpt_av_voice_utils::nn::{max_pool2d, upsample_nearest2d, Conv2d, LayerNorm, Rng};
@@ -30,7 +30,12 @@ pub struct SeparationModelConfig {
 
 impl Default for SeparationModelConfig {
     fn default() -> Self {
-        SeparationModelConfig { n_bins: 257, freq_multiple: 8, depth: 3, base_channels: 8 }
+        SeparationModelConfig {
+            n_bins: 257,
+            freq_multiple: 8,
+            depth: 3,
+            base_channels: 8,
+        }
     }
 }
 
@@ -42,7 +47,9 @@ impl SeparationModelConfig {
 
     pub fn validate(&self) -> Result<(), VoiceError> {
         if self.n_bins == 0 || self.base_channels == 0 || self.depth == 0 {
-            return Err(VoiceError::config("n_bins, base_channels and depth must be > 0"));
+            return Err(VoiceError::config(
+                "n_bins, base_channels and depth must be > 0",
+            ));
         }
         if self.freq_multiple < (1usize << self.depth) {
             return Err(VoiceError::config("freq_multiple must be at least 2^depth"));
@@ -89,7 +96,10 @@ pub struct SeparationModel {
 impl SeparationModel {
     /// Builds the model from decoded tensors (names produced by
     /// [`SeparationModel::to_tensors`]).
-    pub fn from_tensors(tensors: &std::collections::BTreeMap<String, Tensor>, config: SeparationModelConfig) -> Result<Self, VoiceError> {
+    pub fn from_tensors(
+        tensors: &std::collections::BTreeMap<String, Tensor>,
+        config: SeparationModelConfig,
+    ) -> Result<Self, VoiceError> {
         config.validate()?;
         let load_conv = |name: &str| -> Result<Conv2d, VoiceError> {
             let w = tensors
@@ -101,14 +111,19 @@ impl SeparationModel {
             if w.shape.len() != 4 {
                 return Err(VoiceError::model(format!("{name}.weight must be 4-D")));
             }
-            Ok(Conv2d::new(
-                Array4::from_shape_vec(
-                    [w.shape[0], w.shape[1], w.shape[2], w.shape[3]],
-                    w.data.clone(),
-                )
-                .map_err(|e| VoiceError::model(format!("{name}.weight: {e}")))?,
-                ndarray::Array1::from(b.data.clone()),
-            ))
+            let weight = Array4::from_shape_vec(
+                [w.shape[0], w.shape[1], w.shape[2], w.shape[3]],
+                w.data.clone(),
+            )
+            .map_err(|e| VoiceError::model(format!("{name}.weight: {e}")))?;
+            if b.data.len() != weight.dim().0 {
+                return Err(VoiceError::model(format!(
+                    "{name}.bias has {} elements, expected {}",
+                    b.data.len(),
+                    weight.dim().0
+                )));
+            }
+            Ok(Conv2d::new(weight, ndarray::Array1::from(b.data.clone())))
         };
         let load_ln = |name: &str, ch: usize| -> Result<LayerNorm, VoiceError> {
             let s = tensors
@@ -120,12 +135,19 @@ impl SeparationModel {
             if s.data.len() != ch || b.data.len() != ch {
                 return Err(VoiceError::model(format!("{name} channel mismatch")));
             }
-            Ok(LayerNorm::new(ndarray::Array1::from(s.data.clone()), ndarray::Array1::from(b.data.clone())))
+            Ok(LayerNorm::new(
+                ndarray::Array1::from(s.data.clone()),
+                ndarray::Array1::from(b.data.clone()),
+            ))
         };
 
         let mut encoders = Vec::new();
         for i in 0..config.depth {
-            let ch_in = if i == 0 { 1 } else { config.base_channels << (i - 1) };
+            let ch_in = if i == 0 {
+                1
+            } else {
+                config.base_channels << (i - 1)
+            };
             let ch_out = config.base_channels << i;
             encoders.push(Stage {
                 conv: load_conv(&format!("enc{i}.conv"))?,
@@ -149,7 +171,16 @@ impl SeparationModel {
             let _ = skip_ch;
         }
         let final_conv = load_conv("final.conv")?;
-        Ok(SeparationModel { config, encoders, bottleneck, decoders, final_conv })
+        if final_conv.weight.dim().0 != 1 {
+            return Err(VoiceError::model("final.conv must output 1 channel"));
+        }
+        Ok(SeparationModel {
+            config,
+            encoders,
+            bottleneck,
+            decoders,
+            final_conv,
+        })
     }
 
     /// Deterministic random init for tests/demo export.
@@ -162,10 +193,17 @@ impl SeparationModel {
         };
         let mut encoders = Vec::new();
         for i in 0..config.depth {
-            let ch_in = if i == 0 { 1 } else { config.base_channels << (i - 1) };
+            let ch_in = if i == 0 {
+                1
+            } else {
+                config.base_channels << (i - 1)
+            };
             encoders.push(mk_stage(ch_in, config.base_channels << i));
         }
-        let bottleneck = mk_stage(config.base_channels << (config.depth - 1), config.base_channels << config.depth);
+        let bottleneck = mk_stage(
+            config.base_channels << (config.depth - 1),
+            config.base_channels << config.depth,
+        );
         let mut decoders = Vec::new();
         for i in (0..config.depth).rev() {
             // Upsampled features (2·base<<i) concatenated with the skip
@@ -174,7 +212,13 @@ impl SeparationModel {
             decoders.push(mk_stage(ch_in, config.base_channels << i));
         }
         let final_conv = Conv2d::with_init(&mut rng, config.base_channels, 1, 3, 3);
-        SeparationModel { config, encoders, bottleneck, decoders, final_conv }
+        SeparationModel {
+            config,
+            encoders,
+            bottleneck,
+            decoders,
+            final_conv,
+        }
     }
 
     /// Serializes every parameter for checkpoint export.
@@ -186,7 +230,10 @@ impl SeparationModel {
         ) {
             out.insert(
                 format!("{name}.weight"),
-                (c.weight.shape().to_vec(), c.weight.iter().copied().collect()),
+                (
+                    c.weight.shape().to_vec(),
+                    c.weight.iter().copied().collect(),
+                ),
             );
             out.insert(
                 format!("{name}.bias"),
@@ -269,13 +316,19 @@ impl SeparationModel {
 }
 
 fn gelu3(x: &Array3<f32>) -> Array3<f32> {
-    x.mapv(|v| 0.5 * v * (1.0 + (0.797_884_560_8 * (v + 0.044715 * v * v * v)).tanh()))
+    x.mapv(|v| {
+        0.5 * v * (1.0 + (std::f32::consts::FRAC_2_SQRT_PI * (v + 0.044715 * v * v * v)).tanh())
+    })
 }
 
 fn concat_channels(a: &Array3<f32>, b: &Array3<f32>) -> Array3<f32> {
     let (ca, h, w) = a.dim();
     let cb = b.dim().0;
-    assert_eq!((h, w), (b.dim().1, b.dim().2), "skip spatial dims must match");
+    assert_eq!(
+        (h, w),
+        (b.dim().1, b.dim().2),
+        "skip spatial dims must match"
+    );
     let mut out = Array3::<f32>::zeros((ca + cb, h, w));
     out.slice_mut(s![..ca, .., ..]).assign(a);
     out.slice_mut(s![ca.., .., ..]).assign(b);
@@ -292,7 +345,10 @@ mod tests {
         let mag = Array2::from_shape_fn((257, 40), |(b, t)| ((b + t) as f32 * 0.1).abs() + 0.1);
         let mask = model.forward(&mag);
         assert_eq!(mask.dim(), (257, 40));
-        assert!(mask.iter().all(|v| (0.0..=1.0).contains(v)), "sigmoid range");
+        assert!(
+            mask.iter().all(|v| (0.0..=1.0).contains(v)),
+            "sigmoid range"
+        );
     }
 
     #[test]
@@ -315,12 +371,20 @@ mod tests {
         )
         .unwrap();
         assert_eq!(model.final_conv.weight, loaded.final_conv.weight);
-        assert_eq!(model.encoders[0].conv.weight, loaded.encoders[0].conv.weight);
+        assert_eq!(
+            model.encoders[0].conv.weight,
+            loaded.encoders[0].conv.weight
+        );
     }
 
     #[test]
     fn config_validation() {
         assert!(SeparationModelConfig::default().validate().is_ok());
-        assert!(SeparationModelConfig { depth: 5, ..Default::default() }.validate().is_err());
+        assert!(SeparationModelConfig {
+            depth: 5,
+            ..Default::default()
+        }
+        .validate()
+        .is_err());
     }
 }

@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Unique identifier for a [`TranscriptSegment`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, Default,
+)]
 pub struct SegmentId(pub u64);
 
 impl fmt::Display for SegmentId {
@@ -62,12 +64,19 @@ impl Transcript {
             weighted += f64::from(s.confidence) * w;
             total += w;
         }
-        self.confidence = if total > 0.0 { (weighted / total) as f32 } else { 0.0 };
+        self.confidence = if total > 0.0 {
+            (weighted / total) as f32
+        } else {
+            0.0
+        };
     }
 
     /// Total duration covered by the transcript (end of last segment).
     pub fn duration_secs(&self) -> f64 {
-        self.segments.iter().map(|s| s.end_time).fold(0.0_f64, f64::max)
+        self.segments
+            .iter()
+            .map(|s| s.end_time)
+            .fold(0.0_f64, f64::max)
     }
 
     /// Flattens all word-level timestamps, if present.
@@ -155,7 +164,12 @@ pub struct WordTimestamp {
 impl WordTimestamp {
     /// Creates a word timestamp.
     pub fn new(word: impl Into<String>, start_time: f64, end_time: f64, confidence: f32) -> Self {
-        WordTimestamp { word: word.into(), start_time, end_time, confidence }
+        WordTimestamp {
+            word: word.into(),
+            start_time,
+            end_time,
+            confidence,
+        }
     }
 }
 

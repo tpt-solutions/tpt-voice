@@ -43,7 +43,10 @@ pub fn cosine_distance(a: &[f32], b: &[f32]) -> f32 {
 
 /// MFCC front-end shared by both embedders.
 pub(crate) fn mfcc_frames(samples: &[f32], sample_rate: u32) -> Result<Vec<Vec<f32>>, VoiceError> {
-    let config = MfccConfig { sample_rate, ..MfccConfig::default() };
+    let config = MfccConfig {
+        sample_rate,
+        ..MfccConfig::default()
+    };
     mfcc(samples, &config)
 }
 
@@ -63,7 +66,9 @@ impl EmbeddingModel {
 
     /// Loads a trained model from decoded tensors (names from
     /// [`EmbeddingModel::to_tensors`]).
-    pub fn from_tensors(tensors: &std::collections::BTreeMap<String, Tensor>) -> Result<Self, VoiceError> {
+    pub fn from_tensors(
+        tensors: &std::collections::BTreeMap<String, Tensor>,
+    ) -> Result<Self, VoiceError> {
         let get_conv = |name: &str| -> Result<Conv1d, VoiceError> {
             let w = tensors
                 .get(&format!("{name}.weight"))
@@ -75,8 +80,11 @@ impl EmbeddingModel {
                 return Err(VoiceError::model(format!("{name}.weight must be 3-D")));
             }
             Ok(Conv1d::new(
-                ndarray::Array3::from_shape_vec([w.shape[0], w.shape[1], w.shape[2]], w.data.clone())
-                    .map_err(|e| VoiceError::model(format!("{name}.weight: {e}")))?,
+                ndarray::Array3::from_shape_vec(
+                    [w.shape[0], w.shape[1], w.shape[2]],
+                    w.data.clone(),
+                )
+                .map_err(|e| VoiceError::model(format!("{name}.weight: {e}")))?,
                 ndarray::Array1::from(b.data.clone()),
             ))
         };
@@ -90,7 +98,10 @@ impl EmbeddingModel {
             let b = tensors
                 .get(&format!("tdnn{i}.ln.bias"))
                 .ok_or_else(|| VoiceError::model(format!("missing tdnn{i}.ln.bias")))?;
-            norms.push(LayerNorm::new(ndarray::Array1::from(s.data.clone()), ndarray::Array1::from(b.data.clone())));
+            norms.push(LayerNorm::new(
+                ndarray::Array1::from(s.data.clone()),
+                ndarray::Array1::from(b.data.clone()),
+            ));
         }
         let w = tensors
             .get("proj.weight")
@@ -103,8 +114,39 @@ impl EmbeddingModel {
                 .map_err(|e| VoiceError::model(format!("proj.weight: {e}")))?,
             ndarray::Array1::from(b.data.clone()),
         );
+        // Cross-validate chained dimensions so a corrupt checkpoint
+        // surfaces as an error, not a panic at inference time.
         let n_mfcc = convs[0].weight.dim().1;
-        Ok(EmbeddingModel { convs, norms, proj, n_mfcc })
+        for (i, conv) in convs.iter().enumerate() {
+            if norms[i].scale.len() != conv.weight.dim().0 {
+                return Err(VoiceError::model(format!(
+                    "tdnn{i} norm/channel mismatch ({} vs {})",
+                    norms[i].scale.len(),
+                    conv.weight.dim().0
+                )));
+            }
+            if i + 1 < convs.len() && conv.weight.dim().0 != convs[i + 1].weight.dim().1 {
+                return Err(VoiceError::model(format!(
+                    "tdnn{i} → tdnn{} channel mismatch",
+                    i + 1
+                )));
+            }
+        }
+        let last_ch = convs.last().expect("three convs").weight.dim().0;
+        if proj.weight.dim() != (EmbeddingModel::OUTPUT_DIM, 2 * last_ch) {
+            return Err(VoiceError::model(format!(
+                "proj.weight must be ({}, {}), got {:?}",
+                EmbeddingModel::OUTPUT_DIM,
+                2 * last_ch,
+                proj.weight.dim()
+            )));
+        }
+        Ok(EmbeddingModel {
+            convs,
+            norms,
+            proj,
+            n_mfcc,
+        })
     }
 
     /// Deterministic random init (for tests/demo export).
@@ -123,26 +165,58 @@ impl EmbeddingModel {
         }
         // proj: (2*32 pooled stats) → 256
         let proj = Linear::with_init(&mut rng, 2 * 32, Self::OUTPUT_DIM);
-        EmbeddingModel { convs, norms, proj, n_mfcc: 20 }
+        EmbeddingModel {
+            convs,
+            norms,
+            proj,
+            n_mfcc: 20,
+        }
     }
 
     /// Serializes parameters for checkpoint export.
     pub fn to_tensors(&self) -> std::collections::BTreeMap<String, (Vec<usize>, Vec<f32>)> {
         let mut out = std::collections::BTreeMap::new();
         for (i, c) in self.convs.iter().enumerate() {
-            out.insert(format!("tdnn{i}.weight"), (c.weight.shape().to_vec(), c.weight.iter().copied().collect()));
-            out.insert(format!("tdnn{i}.bias"), (vec![c.bias.len()], c.bias.iter().copied().collect()));
+            out.insert(
+                format!("tdnn{i}.weight"),
+                (
+                    c.weight.shape().to_vec(),
+                    c.weight.iter().copied().collect(),
+                ),
+            );
+            out.insert(
+                format!("tdnn{i}.bias"),
+                (vec![c.bias.len()], c.bias.iter().copied().collect()),
+            );
             out.insert(
                 format!("tdnn{i}.ln.weight"),
-                (vec![self.norms[i].scale.len()], self.norms[i].scale.iter().copied().collect()),
+                (
+                    vec![self.norms[i].scale.len()],
+                    self.norms[i].scale.iter().copied().collect(),
+                ),
             );
             out.insert(
                 format!("tdnn{i}.ln.bias"),
-                (vec![self.norms[i].bias.len()], self.norms[i].bias.iter().copied().collect()),
+                (
+                    vec![self.norms[i].bias.len()],
+                    self.norms[i].bias.iter().copied().collect(),
+                ),
             );
         }
-        out.insert("proj.weight".into(), (self.proj.weight.shape().to_vec(), self.proj.weight.iter().copied().collect()));
-        out.insert("proj.bias".into(), (vec![self.proj.bias.len()], self.proj.bias.iter().copied().collect()));
+        out.insert(
+            "proj.weight".into(),
+            (
+                self.proj.weight.shape().to_vec(),
+                self.proj.weight.iter().copied().collect(),
+            ),
+        );
+        out.insert(
+            "proj.bias".into(),
+            (
+                vec![self.proj.bias.len()],
+                self.proj.bias.iter().copied().collect(),
+            ),
+        );
         out
     }
 }
@@ -225,7 +299,11 @@ impl ClassicalEmbedding {
         let mut best_lag = 0usize;
         let mut best_corr = 0.0f32;
         for lag in min_lag..max_lag.min(window) {
-            let corr: f32 = frame[..window - lag].iter().zip(&frame[lag..]).map(|(a, b)| a * b).sum();
+            let corr: f32 = frame[..window - lag]
+                .iter()
+                .zip(&frame[lag..])
+                .map(|(a, b)| a * b)
+                .sum();
             if corr > best_corr {
                 best_corr = corr;
                 best_lag = lag;
@@ -300,8 +378,16 @@ mod tests {
         let a2 = e.embed(&buzz(155.0, 1.2), 16_000).unwrap();
         let b1 = e.embed(&buzz(400.0, 1.0), 16_000).unwrap();
         assert_eq!(a1.len(), ClassicalEmbedding::OUTPUT_DIM);
-        assert!(cosine_distance(&a1, &a2) < 0.1, "same voice similar: {}", cosine_distance(&a1, &a2));
-        assert!(cosine_distance(&a1, &b1) > 0.1, "different voices distinct: {}", cosine_distance(&a1, &b1));
+        assert!(
+            cosine_distance(&a1, &a2) < 0.1,
+            "same voice similar: {}",
+            cosine_distance(&a1, &a2)
+        );
+        assert!(
+            cosine_distance(&a1, &b1) > 0.1,
+            "different voices distinct: {}",
+            cosine_distance(&a1, &b1)
+        );
         assert!(cosine_distance(&a1, &b1) > cosine_distance(&a1, &a2));
     }
 

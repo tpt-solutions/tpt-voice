@@ -49,8 +49,8 @@ pub struct ForcedAlignment {
     pub score: f32,
 }
 
-/// CTC state count for a sequence of `L` units: `2L + 1`
-/// (`u0, blank, u1, blank, …, uL, blank` interleaving).
+/// CTC state machine for `L` units: `2L` states
+/// (`u0, blank, u1, blank, …, u_{L-1}, trailing blank`).
 fn state_label(state: usize, units: &[AlignmentUnit]) -> Option<usize> {
     if state % 2 == 1 {
         None // blank state
@@ -74,7 +74,7 @@ pub fn ctc_align(
     let t_len = emissions.nrows();
     let n_labels = emissions.ncols();
     let l = units.len();
-    let states = 2 * l + 1;
+    let states = 2 * l;
     if t_len < states {
         return Err(VoiceError::decode(format!(
             "audio has {t_len} frames but {l} units need at least {states}"
@@ -101,14 +101,16 @@ pub fn ctc_align(
     let mut back = vec![vec![0u8; states]; t_len];
 
     dp[0][0] = frame_log_prob(0, state_label(0, units));
-    dp[0][1] = frame_log_prob(0, None);
-    for s in 2..states {
-        dp[0][s] = neg_inf;
+    if states > 1 {
+        dp[0][1] = frame_log_prob(0, None);
+    }
+    for v in dp[0].iter_mut().skip(2) {
+        *v = neg_inf;
     }
 
     for t in 1..t_len {
-        let prev = &dp[(t - 1) % 2];
-        let cur = &mut dp[t % 2];
+        let prev = std::mem::take(&mut dp[(t - 1) % 2]);
+        let mut cur = std::mem::take(&mut dp[t % 2]);
         for s in 0..states {
             // Allowed predecessors: stay, skip one state; and skip two
             // only when the target and the state two back are both
@@ -136,6 +138,8 @@ pub fn ctc_align(
             }
             back[t][s] = best_prev;
         }
+        dp[(t - 1) % 2] = prev;
+        dp[t % 2] = cur;
     }
 
     // Backtrack from the last two states (final blank or final unit).
@@ -173,7 +177,10 @@ pub fn ctc_align(
             end_frame: *frames.last().unwrap(),
         });
     }
-    Ok(ForcedAlignment { units: units_out, score })
+    Ok(ForcedAlignment {
+        units: units_out,
+        score,
+    })
 }
 
 #[cfg(test)]
@@ -226,7 +233,10 @@ mod tests {
         let alignment = ctc_align(&e, &units, 0).unwrap();
         let u0 = alignment.units[0];
         let u1 = alignment.units[1];
-        assert!(u1.start_frame >= 9, "second unit must come after the blank gap");
+        assert!(
+            u1.start_frame >= 9,
+            "second unit must come after the blank gap"
+        );
         assert!(u0.end_frame < u1.start_frame);
     }
 
