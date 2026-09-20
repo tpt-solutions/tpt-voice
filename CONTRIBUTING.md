@@ -1,8 +1,11 @@
 # Contributing to tpt-voice
 
-Thank you for contributing! By submitting a pull request you agree that your
-contribution will be dual-licensed under **MIT OR Apache-2.0** (see
-`LICENSE-MIT` / `LICENSE-APACHE`).
+This project does not accept pull requests. Please open a
+[GitHub issue](../../issues) for bug reports, feature requests, or questions
+instead.
+
+The rules below describe the standards the codebase itself is held to; they
+are provided for context, not as a PR checklist.
 
 ## Non-negotiable rules
 

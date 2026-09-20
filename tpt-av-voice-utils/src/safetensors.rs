@@ -85,15 +85,21 @@ pub fn read_safetensors(bytes: &[u8]) -> Result<BTreeMap<String, Tensor>, VoiceE
         return Err(VoiceError::weights("file too short for safetensors header"));
     }
     let header_len = u64::from_le_bytes(bytes[0..8].try_into().unwrap()) as usize;
-    if header_len == 0 || 8 + header_len > bytes.len() {
-        return Err(VoiceError::weights(format!(
-            "invalid header length {header_len}"
-        )));
-    }
-    let header_json = &bytes[8..8 + header_len];
+    // `8 + header_len` can overflow usize for a hostile (near-u64::MAX)
+    // header length; use checked arithmetic so this is a clean error
+    // rather than a panic.
+    let header_end = match 8usize.checked_add(header_len) {
+        Some(end) if header_len != 0 && end <= bytes.len() => end,
+        _ => {
+            return Err(VoiceError::weights(format!(
+                "invalid header length {header_len}"
+            )));
+        }
+    };
+    let header_json = &bytes[8..header_end];
     let header: BTreeMap<String, HeaderEntry> = serde_json::from_slice(header_json)
         .map_err(|e| VoiceError::weights(format!("malformed header JSON: {e}")))?;
-    let data = &bytes[8 + header_len..];
+    let data = &bytes[header_end..];
 
     let mut out = BTreeMap::new();
     for (name, entry) in header {

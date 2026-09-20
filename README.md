@@ -23,15 +23,15 @@ C/C++ bindings. Licensing is enforced by `cargo-deny` in CI.
 
 ## Crates
 
-| Crate | Role |
-| :--- | :--- |
-| [`tpt-voice`](tpt-voice) | **One-crate facade**: prelude, `SpeechPipeline`, text-edit + TTS glue |
-| [`tpt-av-voice-utils`](tpt-av-voice-utils) | Shared types, DSP/NN kernels, WAV I/O, weight I/O |
-| [`tpt-av-voice-transcribe`](tpt-av-voice-transcribe) | Speech-to-text (transformer encoder-decoder, streaming) |
-| [`tpt-av-voice-isolate`](tpt-av-voice-isolate) | Real-time voice isolation (STFT masking, U-Net or classical) |
-| [`tpt-av-voice-diarize`](tpt-av-voice-diarize) | Speaker diarization (VAD, embeddings, clustering) |
-| [`tpt-av-voice-align`](tpt-av-voice-align) | Forced alignment + text-based editing (`AudioEdit`) |
-| [`tpt-av-voice-tts`](tpt-av-voice-tts) | Text-to-speech (early stage, formant synthesis) |
+| Crate | Role | README |
+| :--- | :--- | :--- |
+| [`tpt-voice`](tpt-voice) | **One-crate facade**: prelude, `SpeechPipeline`, text-edit + TTS glue | [readme](tpt-voice/README.md) |
+| [`tpt-av-voice-utils`](tpt-av-voice-utils) | Shared types, DSP/NN kernels, WAV I/O, weight I/O | [readme](tpt-av-voice-utils/README.md) |
+| [`tpt-av-voice-transcribe`](tpt-av-voice-transcribe) | Speech-to-text (transformer encoder-decoder, streaming) | [readme](tpt-av-voice-transcribe/README.md) |
+| [`tpt-av-voice-isolate`](tpt-av-voice-isolate) | Real-time voice isolation (STFT masking, U-Net or classical) | [readme](tpt-av-voice-isolate/README.md) |
+| [`tpt-av-voice-diarize`](tpt-av-voice-diarize) | Speaker diarization (VAD, embeddings, clustering) | [readme](tpt-av-voice-diarize/README.md) |
+| [`tpt-av-voice-align`](tpt-av-voice-align) | Forced alignment + text-based editing (`AudioEdit`) | [readme](tpt-av-voice-align/README.md) |
+| [`tpt-av-voice-tts`](tpt-av-voice-tts) | Text-to-speech (early stage, formant synthesis) | [readme](tpt-av-voice-tts/README.md) |
 
 Each sub-crate is independently useful — use just the transcriber, just the
 isolator, or just the diarizer.

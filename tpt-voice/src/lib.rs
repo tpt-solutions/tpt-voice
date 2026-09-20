@@ -45,5 +45,7 @@ pub use tpt_av_voice_utils as utils;
 
 pub mod pipeline;
 pub mod prelude;
+pub mod streaming_pipeline;
 
 pub use pipeline::{apply_text_edit_with_speech, fill_insertions, PipelineOutput, SpeechPipeline};
+pub use streaming_pipeline::StreamingPipeline;

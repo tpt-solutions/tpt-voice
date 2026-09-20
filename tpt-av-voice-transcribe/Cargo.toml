@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 authors.workspace = true
+readme = "README.md"
 keywords = ["asr", "speech", "transcription", "machine-learning"]
 categories = ["multimedia::audio"]
 
@@ -17,3 +18,10 @@ rustfft = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 log = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "mel"
+harness = false

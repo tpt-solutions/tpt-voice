@@ -181,13 +181,39 @@ License: dual **MIT OR Apache-2.0**.
   all library crates (browser-capable); CI job added
 - [x] CI: license + bans + advisories audit, WASM job, MSRV 1.75 job, weekly fuzz workflow
 
-### Follow-ups (tracked, not started)
+### Follow-ups
 
-- [ ] Continuous fuzzing with crash corpora committed as regression tests
-- [ ] Criterion-based benches for kernel-level microbenchmarks (matmul, FFT, mel)
-- [ ] Streaming pipeline composition (isolate → stream-transcribe → online diarize)
+- [x] Continuous fuzzing with crash corpora committed as regression tests
+  — cargo-fuzz is installed but its libFuzzer runtime doesn't run on Windows here
+  (`STATUS_DLL_NOT_FOUND`), so no live campaign was possible in this environment;
+  the weekly CI fuzz workflow still covers that on Linux. Added durable regression
+  tests instead: `tpt-av-voice-utils/tests/fuzz_regressions.rs` (malformed/truncated
+  WAV headers, hostile safetensors headers) and
+  `tpt-av-voice-transcribe/tests/fuzz_regressions.rs` (malformed tokenizer JSON).
+  Writing these caught a real bug — `read_safetensors` panicked with "attempt to add
+  with overflow" on a near-`u64::MAX` header length — fixed with checked arithmetic
+  in `tpt-av-voice-utils/src/safetensors.rs`.
+- [x] Criterion-based benches for kernel-level microbenchmarks (matmul, FFT, mel)
+  — added `criterion` dev-dependency + `benches/` to `tpt-av-voice-utils` (`matmul`/
+  `matmul_t` over `nn::matmul`), `tpt-av-voice-isolate` (`stft` forward transform),
+  and `tpt-av-voice-transcribe` (`mel` log-mel extraction). All three compile clean
+  under `cargo bench --no-run`.
+- [x] Streaming pipeline composition (isolate → stream-transcribe → online diarize)
+  — `tpt-voice/src/streaming_pipeline.rs`: `StreamingPipeline` borrows a
+  `VoiceIsolator` (same convention as `StreamingIsolator` itself), owns a
+  `StreamingTranscriber` and `StreamingDiarizer`, and annotates each finalized
+  utterance's segments against the diarization timeline accumulated so far (same
+  overlap rule as `annotate_transcript`, applied incrementally). Exercised
+  end-to-end in `streaming_pipeline::tests` against the `utils::signals::alternating_speakers`
+  fixture chunked through `chunk_pcm`.
 - [ ] `wgpu` GPU backend (see Phase 5 deferral)
 - [ ] Trained model weights + LibriSpeech/VoxCeleb conformance runs (Phase 1/2 blockers)
-- [ ] docs.rs-friendly feature flags (`--no-default-features` docs pass) + crate
+- [x] docs.rs-friendly feature flags (`--no-default-features` docs pass) + crate
   categories/README doc scraping on publish
+  — added `[package.metadata.docs.rs] all-features = true` to `tpt-av-voice-utils`
+  (the only crate with optional features, `avx512`); every publishable crate now
+  has `readme = "../README.md"` (verified via `cargo package --list`) alongside its
+  existing `description`/`keywords`/`categories`/`repository`/`license` fields;
+  `tpt-av-voice-utils` categories widened to `["multimedia::audio", "algorithms"]`
+  to better match its DSP/NN kernel content.
 

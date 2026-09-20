@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 authors.workspace = true
+readme = "README.md"
 keywords = ["audio", "alignment", "editing", "speech"]
 categories = ["multimedia::audio"]
 
