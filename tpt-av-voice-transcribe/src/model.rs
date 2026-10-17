@@ -14,7 +14,7 @@
 use ndarray::{s, Array1, Array2};
 use serde::{Deserialize, Serialize};
 
-use tpt_av_voice_utils::nn::{gelu, matmul, softmax_rows, Conv1d, LayerNorm, Linear};
+use tpt_av_voice_utils::nn::{gelu_exact as gelu, matmul, softmax_rows, Conv1d, LayerNorm, Linear};
 use tpt_av_voice_utils::VoiceError;
 
 /// Named model size presets (spec Phase 5: "larger, more accurate models"
@@ -290,7 +290,8 @@ impl Encoder {
 
     /// `mel (n_mels, T) → audio embeddings (T/2, d)`.
     pub fn forward(&self, mel: &Array2<f32>) -> Array2<f32> {
-        let mut x = self.conv2.forward(&gelu(&self.conv1.forward(mel)));
+        // Whisper applies GELU after both strided convolutions.
+        let mut x = gelu(&self.conv2.forward(&gelu(&self.conv1.forward(mel))));
         let t = x.ncols().min(self.positional.nrows());
         x = x.slice(s![.., ..t]).to_owned() + self.positional.slice(s![..t, ..]).t();
         // x is (d, T) here; transpose to token-major.

@@ -252,6 +252,23 @@ pub fn gelu(x: &Array2<f32>) -> Array2<f32> {
     })
 }
 
+/// Exact GELU, `x · Φ(x)` via the error function. Whisper is trained with
+/// this variant; the tanh approximation above differs from it by up to ~3e-4.
+pub fn gelu_exact(x: &Array2<f32>) -> Array2<f32> {
+    x.mapv(|v| 0.5 * v * (1.0 + erf(v * std::f32::consts::FRAC_1_SQRT_2)))
+}
+
+/// Error function, Abramowitz & Stegun 7.1.26 (absolute error < 1.5e-7).
+pub fn erf(x: f32) -> f32 {
+    let sign = if x < 0.0 { -1.0 } else { 1.0 };
+    let x = x.abs();
+    let t = 1.0 / (1.0 + 0.327_591_1 * x);
+    let poly = t
+        * (0.254_829_592
+            + t * (-0.284_496_736 + t * (1.421_413_741 + t * (-1.453_152_027 + t * 1.061_405_429))));
+    sign * (1.0 - poly * (-x * x).exp())
+}
+
 /// ReLU activation.
 pub fn relu(x: &Array2<f32>) -> Array2<f32> {
     x.mapv(|v| v.max(0.0))

@@ -171,7 +171,7 @@ impl Transcriber {
         let audio = self.model.encode(&mel);
         // The bare SOT prompt is used here; trained checkpoints extend it
         // with language/task tokens as a prompt convention.
-        let prompt = [self.tokenizer.sot_token()];
+        let prompt = self.decode_prompt();
         let cfg = DecodeConfig {
             max_tokens: self.config.max_tokens_per_window,
             beam_width: 1,
@@ -198,7 +198,7 @@ impl Transcriber {
         // Prompt + generated log-prob pass.
         let mel = self.frontend.log_mel(window);
         let audio = self.model.encode(&mel);
-        let mut tokens = vec![self.tokenizer.sot_token()];
+        let mut tokens = self.decode_prompt();
         tokens.extend_from_slice(generated);
         let logits = self.model.decode_logits(&tokens, &audio);
         // logits[i] predicts tokens[i + 1].
@@ -217,6 +217,16 @@ impl Transcriber {
         } else {
             total / count as f32
         }
+    }
+
+    /// The decoder prompt: start-of-transcript, then `<|notimestamps|>` when the
+    /// vocabulary has it. Whisper's English checkpoints are trained with both.
+    fn decode_prompt(&self) -> Vec<usize> {
+        let mut prompt = vec![self.tokenizer.sot_token()];
+        if let Some(id) = self.tokenizer.token_to_id(crate::tokenizer::NO_TIMESTAMPS) {
+            prompt.push(id);
+        }
+        prompt
     }
 
     /// Borrows the tokenizer (e.g. for prompt construction).

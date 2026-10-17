@@ -27,6 +27,8 @@ pub trait Tokenizer {
 /// Special-token names used by the engine.
 pub const EOT: &str = "<|endoftext|>";
 pub const SOT: &str = "<|startoftranscript|>";
+/// Suppresses timestamp tokens in the decoder prompt (Whisper English models).
+pub const NO_TIMESTAMPS: &str = "<|notimestamps|>";
 
 /// Byte-level BPE tokenizer.
 #[derive(Debug, Clone)]
